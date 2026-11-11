@@ -56,6 +56,22 @@ ion-input.snacki-input {
   margin: 0 0 6px 6px;
 }
 
+/* Campo con botón de mostrar/ocultar (patrón compartido: login, register, perfil) */
+.with-icon {
+  position: relative;
+
+  .eye {
+    position: absolute;
+    right: 16px;
+    top: 11px;
+    background: none;
+    border: 0;
+    padding: 0;
+    color: #222;
+    ion-icon { font-size: 22px; }
+  }
+}
+
 /* Botón pill azul */
 ion-button.snacki-btn {
   --border-radius: 24px;
