@@ -1,13 +1,15 @@
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { IonButton, IonContent, IonInput, ToastController } from '@ionic/angular';
+import { IonButton, IonContent, IonIcon, IonInput, ToastController } from '@ionic/angular';
+import { addIcons } from 'ionicons';
+import { eyeOffOutline, eyeOutline, lockClosedOutline, personOutline } from 'ionicons/icons';
 
 @Component({
   selector: 'app-login',
   templateUrl: './login.page.html',
   styleUrls: ['./login.page.scss'],
-  imports: [IonContent, IonInput, IonButton, FormsModule],
+  imports: [IonContent, IonInput, IonButton, IonIcon, FormsModule],
 })
 export class LoginPage {
   private router = inject(Router);
@@ -15,8 +17,23 @@ export class LoginPage {
 
   usuario = '';
   password = '';
+  verPassword = false;
 
-  iniciarSesion() {
+  constructor() {
+    addIcons({ personOutline, lockClosedOutline, eyeOutline, eyeOffOutline });
+  }
+
+  async iniciarSesion() {
+    if (!this.usuario.trim() || !this.password) {
+      const t = await this.toast.create({
+        message: 'Completa tu usuario y contraseña para continuar.',
+        duration: 2200,
+        color: 'danger',
+        position: 'bottom',
+      });
+      await t.present();
+      return;
+    }
     // TODO: reemplazar por autenticación real contra el backend.
     this.router.navigateByUrl('/tabs/explorar');
   }

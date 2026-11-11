@@ -1,27 +1,68 @@
 <ion-content class="snacki-page" [fullscreen]="true">
   <div class="login-wrap">
-    <h1 class="brand">SNACKI</h1>
+    <!-- Hero de marca: logo con nombre + tagline -->
+    <header class="brand-hero">
+      <img
+        class="brand-logo"
+        src="assets/img/logo-snacki.png"
+        alt="Snacki"
+        width="240"
+        height="80"
+      />
+      <p class="tagline">Escanea, come y gana puntos</p>
+    </header>
 
-    <ion-input
-      class="snacki-input"
-     
-      type="text"
-      placeholder="Nombre de Usuario o Correo Electronico"
-      [(ngModel)]="usuario"
-    ></ion-input>
+    <form (ngSubmit)="iniciarSesion()">
+      <label class="snacki-label">Usuario o Correo Electrónico</label>
+      <ion-input
+        class="snacki-input"
+        name="usuario"
+        type="text"
+        autocomplete="username"
+        aria-label="Usuario o Correo Electrónico"
+        placeholder="Tu usuario o correo"
+        [(ngModel)]="usuario"
+      >
+        <ion-icon slot="start" aria-hidden="true" name="person-outline"></ion-icon>
+      </ion-input>
 
-    <ion-input
-      class="snacki-input"
-     
-      type="password"
-      placeholder="Contraseña"
-      [(ngModel)]="password"
-    ></ion-input>
+      <label class="snacki-label">Contraseña</label>
+      <div class="with-icon">
+        <ion-input
+          class="snacki-input"
+          name="password"
+          [type]="verPassword ? 'text' : 'password'"
+          autocomplete="current-password"
+          aria-label="Contraseña"
+          placeholder="Tu contraseña"
+          [(ngModel)]="password"
+        >
+          <ion-icon slot="start" aria-hidden="true" name="lock-closed-outline"></ion-icon>
+        </ion-input>
+        <button
+          type="button"
+          class="eye"
+          (click)="verPassword = !verPassword"
+          [attr.aria-label]="verPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+        >
+          <ion-icon aria-hidden="true" [name]="verPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+        </button>
+      </div>
 
-    <div class="actions">
-      <ion-button class="snacki-btn" shape="round" (click)="iniciarSesion()">Iniciar Sesion</ion-button>
-      <ion-button class="snacki-btn" shape="round" (click)="olvideContrasena()">Olvidaste la Contraseña?</ion-button>
-      <ion-button class="snacki-btn" shape="round" (click)="registrarse()">Registrarse a Snacki</ion-button>
+      <ion-button class="snacki-btn submit" type="submit" expand="block">Iniciar Sesión</ion-button>
+    </form>
+
+    <div class="center">
+      <ion-button class="link-btn" fill="clear" size="small" (click)="olvideContrasena()">
+        ¿Olvidaste tu contraseña?
+      </ion-button>
     </div>
+
+    <footer class="signup-row">
+      <span>¿No tienes una cuenta?</span>
+      <ion-button class="link-btn signup" fill="clear" size="small" (click)="registrarse()">
+        Regístrate
+      </ion-button>
+    </footer>
   </div>
 </ion-content>
