@@ -1,0 +1,30 @@
+<ion-content class="snacki-page" [fullscreen]="true">
+  <app-snacki-header></app-snacki-header>
+  <app-inicio-bar></app-inicio-bar>
+
+  <section class="points-card snacki-card">
+    <div class="caption"><ion-icon name="card-outline"></ion-icon> Resumen de puntos de la cuenta</div>
+    <div class="value">{{ total | number }} PTS EN TOTAL</div>
+  </section>
+
+  <div class="rows">
+    @for (local of locales; track local.id) {
+      <div class="row">
+        <img [src]="local.logo" [alt]="local.nombre" />
+        <span class="name">{{ local.nombre }}</span>
+        <span class="detail">
+          Pts. Asociados: {{ local.puntos | number }} PTS
+          <small class="venc">Vencimiento: {{ local.vencimiento | date: 'dd/MM/yyyy' }}</small>
+        </span>
+      </div>
+    }
+  </div>
+
+  <h2 class="canjes-title">Ultimos Canjes Realizados:</h2>
+  @for (c of canjes; track $index) {
+    <div class="canje">
+      <span>{{ c.local }} · {{ c.descripcion }}</span>
+      <span>-{{ c.puntos | number }} PTS · {{ c.fecha | date: 'dd/MM/yyyy' }}</span>
+    </div>
+  }
+</ion-content>

@@ -1,0 +1,21 @@
+<ion-content class="snacki-page" [fullscreen]="true">
+  <app-snacki-header></app-snacki-header>
+  <app-inicio-bar></app-inicio-bar>
+
+  <section class="points-card snacki-card">
+    <div class="caption"><ion-icon name="card-outline"></ion-icon> Puntos totales.</div>
+    <div class="value">{{ total | number }} PTS</div>
+  </section>
+
+  <div class="item-grid">
+    @for (local of locales; track local.id) {
+      <article class="item-card" (click)="abrir(local)">
+        <div class="media"><img [src]="local.logo" [alt]="local.nombre" /></div>
+        <div class="info">
+          <div class="name">{{ local.nombre }}</div>
+          <div class="pts">{{ local.puntos | number }} PTS</div>
+        </div>
+      </article>
+    }
+  </div>
+</ion-content>
