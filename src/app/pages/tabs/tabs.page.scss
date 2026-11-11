@@ -1,0 +1,16 @@
+ion-tab-bar {
+  --background: #fff;
+  --color: #555;
+  --color-selected: var(--ion-color-primary);
+  border-top: 1px solid #e6e6e6;
+  height: 58px;
+}
+
+ion-tab-button {
+  --padding-top: 4px;
+  ion-label { font-size: 10px; margin-top: 2px; }
+  ion-icon { font-size: 22px; }
+}
+
+/* En el diseño el botón QR siempre se muestra en azul */
+.tab-qr { --color: var(--ion-color-primary); }

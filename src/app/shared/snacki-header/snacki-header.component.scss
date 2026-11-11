@@ -1,0 +1,31 @@
+.snacki-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--ion-safe-area-top, 0px) + 14px) 0 10px;
+
+  h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+}
+
+.back-btn {
+  position: absolute;
+  left: 0;
+  top: calc(var(--ion-safe-area-top, 0px) + 6px);
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--snacki-back);
+  color: #bfe0ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  ion-icon { font-size: 32px; }
+}

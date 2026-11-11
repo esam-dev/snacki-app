@@ -1,0 +1,31 @@
+<ion-content class="snacki-page" [fullscreen]="true">
+  <app-snacki-header [back]="true"></app-snacki-header>
+
+  <div class="avatar" aria-hidden="true">
+    <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="#777"/><circle cx="50" cy="38" r="15" fill="#fff"/><path d="M22 80c4-18 17-24 28-24s24 6 28 24c-8 8-18 12-28 12s-20-4-28-12z" fill="#fff"/></svg>
+  </div>
+  <div class="center">
+    <ion-button class="snacki-btn small-pill" shape="round" size="small" (click)="agregarFoto()">Agregar una Foto</ion-button>
+  </div>
+
+  <label class="snacki-label">Nombre de Usuario:</label>
+  <ion-input class="snacki-input" [(ngModel)]="nombre"></ion-input>
+
+  <label class="snacki-label">Correo Electronico:</label>
+  <ion-input class="snacki-input" type="email" [(ngModel)]="correo"></ion-input>
+
+  <label class="snacki-label">Cedula o R.U.C</label>
+  <div class="with-icon">
+    <ion-input class="snacki-input" [value]="cedulaMostrada" [readonly]="true"></ion-input>
+    <button type="button" class="eye" (click)="verCedula = !verCedula" aria-label="Mostrar u ocultar cédula">
+      <ion-icon [name]="verCedula ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+    </button>
+  </div>
+
+  <label class="snacki-label">Fecha de Nacimiento</label>
+  <ion-input class="snacki-input" type="date" [(ngModel)]="nacimiento"></ion-input>
+
+  <ion-checkbox class="snacki-check" labelPlacement="end" justify="start" [(ngModel)]="notificaciones">
+    Enviar Notificaciones al correo Electronico.
+  </ion-checkbox>
+</ion-content>

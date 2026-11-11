@@ -1,0 +1,22 @@
+<ion-content class="snacki-page" [fullscreen]="true">
+  <app-snacki-header></app-snacki-header>
+
+  <ion-searchbar
+    placeholder="Buscar locales"
+    [debounce]="200"
+    (ionInput)="filtrar($event)"
+  ></ion-searchbar>
+
+  <div class="item-grid">
+    @for (local of resultados; track local.id) {
+      <article class="item-card" (click)="abrir(local)">
+        <div class="media"><img [src]="local.logo" [alt]="local.nombre" /></div>
+        <div class="info">
+          <div class="name">{{ local.nombre }}</div>
+        </div>
+      </article>
+    } @empty {
+      <p class="empty">No se encontraron locales.</p>
+    }
+  </div>
+</ion-content>
