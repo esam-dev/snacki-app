@@ -1,33 +1,45 @@
 <ion-content class="snacki-page" [fullscreen]="true">
   <app-snacki-header [back]="true"></app-snacki-header>
 
-  <div class="avatar" aria-hidden="true">
-    <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="#777"/><circle cx="50" cy="38" r="15" fill="#fff"/><path d="M22 80c4-18 17-24 28-24s24 6 28 24c-8 8-18 12-28 12s-20-4-28-12z" fill="#fff"/></svg>
-  </div>
-  <div class="center">
-    <ion-button class="snacki-btn small-pill" shape="round" size="small" (click)="agregarFoto()">Agregar una Foto</ion-button>
-  </div>
+  <form (ngSubmit)="registrar()">
+    <div class="avatar" aria-hidden="true">
+      <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="#777"/><circle cx="50" cy="38" r="15" fill="#fff"/><path d="M22 80c4-18 17-24 28-24s24 6 28 24c-8 8-18 12-28 12s-20-4-28-12z" fill="#fff"/></svg>
+    </div>
+    <div class="center">
+      <ion-button class="snacki-btn small-pill" shape="round" size="small" type="button" (click)="agregarFoto()">Agregar una Foto</ion-button>
+    </div>
 
-  <label class="snacki-label">Nombre de Usuario:</label>
-  <ion-input class="snacki-input" placeholder="Agregar Nombre y Apellido." [(ngModel)]="form.nombre"></ion-input>
+    <label class="snacki-label">Nombre de Usuario:</label>
+    <ion-input class="snacki-input" name="nombre" autocomplete="name" aria-label="Nombre de Usuario" placeholder="Agregar Nombre y Apellido." [(ngModel)]="form.nombre"></ion-input>
 
-  <label class="snacki-label">Contraseña:</label>
-  <ion-input class="snacki-input" type="password" placeholder="Agregar Contraseña" [(ngModel)]="form.password"></ion-input>
+    <label class="snacki-label">Contraseña:</label>
+    <div class="with-icon">
+      <ion-input class="snacki-input" name="password" [type]="verPassword ? 'text' : 'password'" autocomplete="new-password" aria-label="Contraseña" placeholder="Agregar Contraseña" [(ngModel)]="form.password"></ion-input>
+      <button type="button" class="eye" (click)="verPassword = !verPassword" [attr.aria-label]="verPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'">
+        <ion-icon aria-hidden="true" [name]="verPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+      </button>
+    </div>
 
-  <label class="snacki-label">Confirmar Contraseña:</label>
-  <ion-input class="snacki-input" type="password" placeholder="Confirme Contraseña" [(ngModel)]="form.confirmar"></ion-input>
+    <label class="snacki-label">Confirmar Contraseña:</label>
+    <div class="with-icon">
+      <ion-input class="snacki-input" name="confirmar" [type]="verConfirmar ? 'text' : 'password'" autocomplete="new-password" aria-label="Confirmar Contraseña" placeholder="Confirme Contraseña" [(ngModel)]="form.confirmar"></ion-input>
+      <button type="button" class="eye" (click)="verConfirmar = !verConfirmar" [attr.aria-label]="verConfirmar ? 'Ocultar contraseña' : 'Mostrar contraseña'">
+        <ion-icon aria-hidden="true" [name]="verConfirmar ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+      </button>
+    </div>
 
-  <label class="snacki-label">Correo Electronico:</label>
-  <ion-input class="snacki-input" type="email" placeholder="Agregar Correo Electronico" [(ngModel)]="form.correo"></ion-input>
+    <label class="snacki-label">Correo Electronico:</label>
+    <ion-input class="snacki-input" name="correo" type="email" autocomplete="email" aria-label="Correo Electronico" placeholder="Agregar Correo Electronico" [(ngModel)]="form.correo"></ion-input>
 
-  <label class="snacki-label">Cedula o R.U.C.:</label>
-  <ion-input class="snacki-input" inputmode="numeric" placeholder="Agregar Cedula o R.U.C" [(ngModel)]="form.cedula"></ion-input>
+    <label class="snacki-label">Cedula o R.U.C.:</label>
+    <ion-input class="snacki-input" name="cedula" inputmode="numeric" aria-label="Cedula o R.U.C." placeholder="Agregar Cedula o R.U.C" [(ngModel)]="form.cedula"></ion-input>
 
-  <ion-checkbox class="snacki-check" labelPlacement="end" justify="start" [(ngModel)]="form.acepta">
-    He leido y aceptado los terminos y condiciones del servicio.
-  </ion-checkbox>
+    <ion-checkbox class="snacki-check" labelPlacement="end" justify="start" [(ngModel)]="form.acepta" name="acepta">
+      He leido y aceptado los terminos y condiciones del servicio.
+    </ion-checkbox>
 
-  <div class="center">
-    <ion-button class="snacki-btn" shape="round" (click)="registrar()">Registrarse</ion-button>
-  </div>
+    <div class="center">
+      <ion-button class="snacki-btn" shape="round" type="submit">Registrarse</ion-button>
+    </div>
+  </form>
 </ion-content>
