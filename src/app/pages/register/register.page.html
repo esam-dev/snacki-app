@@ -12,6 +12,9 @@
     <label class="snacki-label">Nombre de Usuario:</label>
     <ion-input class="snacki-input" name="nombre" autocomplete="name" aria-label="Nombre de Usuario" placeholder="Agregar Nombre y Apellido." [(ngModel)]="form.nombre"></ion-input>
 
+    <label class="snacki-label">Edad:</label>
+    <ion-input class="snacki-input" name="edad" type="number" inputmode="numeric" min="18" max="120" step="1" aria-label="Edad" placeholder="Debes tener 18 años o más" [(ngModel)]="form.edad"></ion-input>
+
     <label class="snacki-label">Contraseña:</label>
     <div class="with-icon">
       <ion-input class="snacki-input" name="password" [type]="verPassword ? 'text' : 'password'" autocomplete="new-password" aria-label="Contraseña" placeholder="Agregar Contraseña" [(ngModel)]="form.password"></ion-input>

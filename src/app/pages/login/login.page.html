@@ -49,7 +49,7 @@
         </button>
       </div>
 
-      <ion-button class="snacki-btn submit" type="submit" expand="block">Iniciar Sesión</ion-button>
+      <ion-button class="snacki-btn submit" type="submit" expand="block" [disabled]="cargando">Iniciar Sesión</ion-button>
     </form>
 
     <div class="center">
@@ -66,3 +66,10 @@
     </footer>
   </div>
 </ion-content>
+
+@if (cargando) {
+  <div class="login-loading" role="status" aria-live="polite" aria-label="Cargando Snacki">
+    <img src="assets/icon/icon-snacki.png" alt="" />
+    <span>Preparando tu wallet...</span>
+  </div>
+}
