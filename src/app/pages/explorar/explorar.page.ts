@@ -6,13 +6,12 @@ import { addIcons } from 'ionicons';
 import { cardOutline } from 'ionicons/icons';
 import { Local, StoreService } from '../../services/store.service';
 import { SnackiHeaderComponent } from '../../shared/snacki-header/snacki-header.component';
-import { InicioBarComponent } from '../../shared/inicio-bar/inicio-bar.component';
 
 @Component({
   selector: 'app-explorar',
   templateUrl: './explorar.page.html',
   styleUrls: ['./explorar.page.scss'],
-  imports: [IonContent, IonIcon, DecimalPipe, SnackiHeaderComponent, InicioBarComponent],
+  imports: [IonContent, IonIcon, DecimalPipe, SnackiHeaderComponent],
 })
 export class ExplorarPage implements OnInit {
   private stores = inject(StoreService);
