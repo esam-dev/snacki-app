@@ -13,8 +13,38 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+    <style>
+      #app-loading {
+        position: fixed;
+        inset: 0;
+        z-index: 100000;
+        display: grid;
+        place-items: center;
+        background: #fff;
+        opacity: 1;
+        transition: opacity 300ms ease;
+      }
+      #app-loading img {
+        display: block;
+        width: min(52vw, 220px);
+        height: auto;
+        animation: snacki-load-pulse 1.2s ease-in-out infinite alternate;
+      }
+      #app-loading.is-hiding { opacity: 0; pointer-events: none; }
+      @keyframes snacki-load-pulse {
+        from { transform: scale(.96); }
+        to { transform: scale(1); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #app-loading img { animation: none; }
+        #app-loading { transition-duration: 0ms; }
+      }
+    </style>
   </head>
   <body>
+    <div id="app-loading" role="status" aria-label="Cargando Snacki">
+      <img src="assets/icon/icon-snacki.png" alt="Snacki" />
+    </div>
     <app-root></app-root>
   </body>
 </html>
