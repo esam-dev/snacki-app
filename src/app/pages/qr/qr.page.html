@@ -1,7 +1,7 @@
 <ion-content class="snacki-page" [fullscreen]="true">
   <app-snacki-header [back]="true"></app-snacki-header>
 
-  <p class="hint">Escanee el Codigo QR del Local Asociado<br />para ver las ofertas y promociones.</p>
+  <p class="hint">Escanea el código QR del comercio<br />para ver recompensas que puedes canjear con tus puntos.</p>
 
   <div class="qr-box">
     <img class="qr" src="assets/img/qr-placeholder.png" alt="Código QR" />
@@ -10,7 +10,7 @@
 
   <div class="center">
     <ion-button class="snacki-btn" shape="round" [disabled]="escaneando" (click)="escanear()">
-      Escanear Codigo QR
+      Escanear QR del comercio
     </ion-button>
   </div>
 </ion-content>

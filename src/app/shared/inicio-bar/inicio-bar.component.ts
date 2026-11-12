@@ -17,7 +17,7 @@ export class InicioBarComponent {
     addIcons({ menuOutline, searchOutline });
   }
 
-  irABuscar() {
-    this.router.navigateByUrl('/tabs/buscar');
+  irAHome() {
+    this.router.navigateByUrl('/tabs/home');
   }
 }

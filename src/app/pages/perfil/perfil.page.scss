@@ -7,16 +7,4 @@
 .center { display: flex; justify-content: center; margin-bottom: 10px; }
 .small-pill { min-width: 0; --padding-start: 16px; --padding-end: 16px; height: 28px; font-size: 13px; }
 
-.with-icon {
-  position: relative;
-  .eye {
-    position: absolute;
-    right: 16px;
-    top: 11px;
-    background: none;
-    border: 0;
-    padding: 0;
-    color: #222;
-    ion-icon { font-size: 22px; }
-  }
-}
+/* Campo con botón de mostrar/ocultar: patrón global .with-icon/.eye */

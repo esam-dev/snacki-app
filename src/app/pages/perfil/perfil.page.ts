@@ -1,9 +1,11 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { IonButton, IonCheckbox, IonContent, IonIcon, IonInput } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { eyeOutline, eyeOffOutline } from 'ionicons/icons';
 import { SnackiHeaderComponent } from '../../shared/snacki-header/snacki-header.component';
+import { AuthService } from '../../services/auth.service';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-perfil',
@@ -12,9 +14,12 @@ import { SnackiHeaderComponent } from '../../shared/snacki-header/snacki-header.
   imports: [IonContent, IonInput, IonButton, IonCheckbox, IonIcon, FormsModule, SnackiHeaderComponent],
 })
 export class PerfilPage {
+  private auth = inject(AuthService);
+  private router = inject(Router);
+
   // Datos de ejemplo del diseño
-  nombre = 'Raul Gonzalez';
-  correo = 'rgonzalez@gmail.com';
+  nombre = this.auth.currentUser?.nombre ?? 'Usuario';
+  correo = this.auth.currentUser?.correo ?? '';
   cedula = '1234599';
   nacimiento = '2000-01-01';
   notificaciones = false;
@@ -30,4 +35,9 @@ export class PerfilPage {
   }
 
   agregarFoto() {}
+
+  cerrarSesion() {
+    this.auth.cerrarSesion();
+    this.router.navigateByUrl('/login');
+  }
 }

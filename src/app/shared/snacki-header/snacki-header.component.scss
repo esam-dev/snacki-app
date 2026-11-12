@@ -5,11 +5,11 @@
   justify-content: center;
   padding: calc(var(--ion-safe-area-top, 0px) + 14px) 0 10px;
 
-  h1 {
-    margin: 0;
-    font-size: 22px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
+  /* Lockup de marca (logo + nombre) proporcionado como imagen */
+  .brand {
+    display: block;
+    width: 120px;
+    height: 40px;
   }
 }
 
