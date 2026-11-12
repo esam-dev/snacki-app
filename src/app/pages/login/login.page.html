@@ -12,8 +12,21 @@
       <p class="tagline">Escanea, come y gana puntos</p>
     </header>
 
+    <div class="account-switch" role="group" aria-label="Tipo de cuenta">
+      <button type="button" [class.active]="tipoCuenta === 'cliente'" [attr.aria-pressed]="tipoCuenta === 'cliente'" (click)="tipoCuenta = 'cliente'">
+        <ion-icon name="person-outline" aria-hidden="true"></ion-icon>
+        <span>Usuario</span>
+        <small>Acumula y canjea puntos</small>
+      </button>
+      <button type="button" [class.active]="tipoCuenta === 'comercio'" [attr.aria-pressed]="tipoCuenta === 'comercio'" (click)="tipoCuenta = 'comercio'">
+        <ion-icon name="storefront-outline" aria-hidden="true"></ion-icon>
+        <span>Comercio</span>
+        <small>Administra recompensas</small>
+      </button>
+    </div>
+
     <form (ngSubmit)="iniciarSesion()">
-      <label class="snacki-label">Usuario o Correo Electrónico</label>
+      <label class="snacki-label">{{ tipoCuenta === 'comercio' ? 'Correo del comercio' : 'Usuario o Correo Electrónico' }}</label>
       <ion-input
         class="snacki-input"
         name="usuario"

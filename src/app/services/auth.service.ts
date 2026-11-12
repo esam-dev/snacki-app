@@ -3,7 +3,11 @@ import { Injectable } from '@angular/core';
 export interface SnackiUser {
   nombre: string;
   correo: string;
+  tipo: 'cliente' | 'comercio';
+  comercioId?: string;
 }
+
+export type TipoCuenta = SnackiUser['tipo'];
 
 const SESSION_KEY = 'snacki.current-user';
 const PROFILES_KEY = 'snacki.profiles';
@@ -17,7 +21,7 @@ export class AuthService {
     return this.usuarioActual;
   }
 
-  iniciarSesion(identificador: string, password: string): boolean {
+  iniciarSesion(identificador: string, password: string, tipo: TipoCuenta = 'cliente'): boolean {
     const valor = identificador.trim();
     if (!valor || !password.trim()) return false;
 
@@ -25,15 +29,22 @@ export class AuthService {
     const perfilGuardado = perfiles.find((perfil) =>
       perfil.correo.toLowerCase() === valor.toLowerCase() || perfil.nombre.toLowerCase() === valor.toLowerCase(),
     );
+    if (perfilGuardado && perfilGuardado.tipo !== tipo) return false;
+    if (tipo === 'comercio' && (!perfilGuardado?.comercioId)) return false;
     const nombre = perfilGuardado?.nombre ?? this.nombreDesdeIdentificador(valor);
     const correo = perfilGuardado?.correo ?? (valor.includes('@') ? valor : '');
 
-    this.guardarSesion({ nombre, correo });
+    this.guardarSesion({ nombre, correo, tipo, ...(tipo === 'comercio' && perfilGuardado?.comercioId ? { comercioId: perfilGuardado.comercioId } : {}) });
     return true;
   }
 
-  registrar(nombre: string, correo: string) {
-    const perfil = { nombre: this.formatearNombre(nombre), correo: correo.trim() };
+  registrar(nombre: string, correo: string, tipo: TipoCuenta = 'cliente', comercioId?: string) {
+    const perfil: SnackiUser = {
+      nombre: this.formatearNombre(nombre),
+      correo: correo.trim(),
+      tipo,
+      ...(tipo === 'comercio' && comercioId ? { comercioId } : {}),
+    };
     const perfiles = this.leerPerfiles().filter((item) => item.correo.toLowerCase() !== perfil.correo.toLowerCase());
     perfiles.push(perfil);
     localStorage.setItem(PROFILES_KEY, JSON.stringify(perfiles));
@@ -53,7 +64,10 @@ export class AuthService {
   private leerSesion(): SnackiUser | null {
     try {
       const valor = localStorage.getItem(SESSION_KEY);
-      return valor ? (JSON.parse(valor) as SnackiUser) : null;
+      if (!valor) return null;
+      const user = JSON.parse(valor) as Partial<SnackiUser>;
+      if (!user.nombre || !user.correo) return null;
+      return { nombre: user.nombre, correo: user.correo, tipo: user.tipo === 'comercio' ? 'comercio' : 'cliente', ...(user.comercioId ? { comercioId: user.comercioId } : {}) };
     } catch {
       return null;
     }
@@ -62,7 +76,10 @@ export class AuthService {
   private leerPerfiles(): SnackiUser[] {
     try {
       const valor = localStorage.getItem(PROFILES_KEY);
-      return valor ? (JSON.parse(valor) as SnackiUser[]) : [];
+      return valor ? (JSON.parse(valor) as Partial<SnackiUser>[]).filter((perfil): perfil is SnackiUser => !!perfil.nombre && !!perfil.correo).map((perfil) => ({
+        nombre: perfil.nombre!, correo: perfil.correo!, tipo: perfil.tipo === 'comercio' ? 'comercio' : 'cliente',
+        ...(perfil.comercioId ? { comercioId: perfil.comercioId } : {}),
+      })) : [];
     } catch {
       return [];
     }

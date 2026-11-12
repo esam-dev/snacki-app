@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { roleGuard } from './services/role.guard';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
@@ -11,7 +12,13 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/register/register.page').then((m) => m.RegisterPage),
   },
   {
+    path: 'comercio',
+    canActivate: [roleGuard('comercio')],
+    loadComponent: () => import('./pages/comercio/comercio.page').then((m) => m.ComercioPage),
+  },
+  {
     path: 'tabs',
+    canActivate: [roleGuard('cliente')],
     loadComponent: () => import('./pages/tabs/tabs.page').then((m) => m.TabsPage),
     children: [
       { path: 'home', loadComponent: () => import('./pages/home/home.page').then((m) => m.HomePage) },

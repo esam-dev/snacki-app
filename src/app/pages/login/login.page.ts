@@ -3,8 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { IonButton, IonContent, IonIcon, IonInput, ToastController } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { eyeOffOutline, eyeOutline, lockClosedOutline, personOutline } from 'ionicons/icons';
-import { AuthService } from '../../services/auth.service';
+import { eyeOffOutline, eyeOutline, lockClosedOutline, personOutline, storefrontOutline } from 'ionicons/icons';
+import { AuthService, TipoCuenta } from '../../services/auth.service';
 
 @Component({
   selector: 'app-login',
@@ -19,23 +19,26 @@ export class LoginPage implements OnInit {
 
   usuario = '';
   password = '';
+  tipoCuenta: TipoCuenta = 'cliente';
   verPassword = false;
   cargando = false;
 
   constructor() {
-    addIcons({ personOutline, lockClosedOutline, eyeOutline, eyeOffOutline });
+    addIcons({ personOutline, lockClosedOutline, eyeOutline, eyeOffOutline, storefrontOutline });
   }
 
   ngOnInit() {
-    if (this.auth.currentUser) this.router.navigateByUrl('/tabs/home');
+    if (this.auth.currentUser) this.irAlInicio();
   }
 
   async iniciarSesion() {
     if (this.cargando) return;
 
-    if (!this.auth.iniciarSesion(this.usuario, this.password)) {
+    if (!this.auth.iniciarSesion(this.usuario, this.password, this.tipoCuenta)) {
       const t = await this.toast.create({
-        message: 'Completa tu usuario y contraseña para continuar.',
+        message: this.usuario.trim() && this.password.trim()
+          ? 'Revisa el tipo de cuenta o regístrate como comercio si aún no tienes un perfil comercial.'
+          : 'Completa tu usuario y contraseña para continuar.',
         duration: 2200,
         color: 'danger',
         position: 'bottom',
@@ -45,7 +48,7 @@ export class LoginPage implements OnInit {
     }
     this.cargando = true;
     await new Promise((resolve) => window.setTimeout(resolve, 2000));
-    this.router.navigateByUrl('/tabs/home');
+    this.irAlInicio();
   }
 
   async olvideContrasena() {
@@ -58,6 +61,10 @@ export class LoginPage implements OnInit {
   }
 
   registrarse() {
-    this.router.navigateByUrl('/register');
+    this.router.navigate(['/register'], { queryParams: { tipo: this.tipoCuenta } });
+  }
+
+  private irAlInicio() {
+    this.router.navigateByUrl(this.auth.currentUser?.tipo === 'comercio' ? '/comercio' : '/tabs/home');
   }
 }

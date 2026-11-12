@@ -1,6 +1,12 @@
 <ion-content class="snacki-page" [fullscreen]="true">
   <app-snacki-header [back]="true"></app-snacki-header>
 
+  <h1 class="register-title">{{ tipoCuenta === 'comercio' ? 'Registra tu comercio' : 'Crea tu cuenta Snacki' }}</h1>
+  <div class="register-switch" role="group" aria-label="Tipo de cuenta">
+    <button type="button" [class.active]="tipoCuenta === 'cliente'" (click)="tipoCuenta = 'cliente'">Usuario</button>
+    <button type="button" [class.active]="tipoCuenta === 'comercio'" (click)="tipoCuenta = 'comercio'">Comercio</button>
+  </div>
+
   <form (ngSubmit)="registrar()">
     <div class="avatar" aria-hidden="true">
       <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="#777"/><circle cx="50" cy="38" r="15" fill="#fff"/><path d="M22 80c4-18 17-24 28-24s24 6 28 24c-8 8-18 12-28 12s-20-4-28-12z" fill="#fff"/></svg>
@@ -9,11 +15,18 @@
       <ion-button class="snacki-btn small-pill" shape="round" size="small" type="button" (click)="agregarFoto()">Agregar una Foto</ion-button>
     </div>
 
-    <label class="snacki-label">Nombre de Usuario:</label>
-    <ion-input class="snacki-input" name="nombre" autocomplete="name" aria-label="Nombre de Usuario" placeholder="Agregar Nombre y Apellido." [(ngModel)]="form.nombre"></ion-input>
+    <label class="snacki-label">{{ tipoCuenta === 'comercio' ? 'Nombre del comercio:' : 'Nombre de Usuario:' }}</label>
+    <ion-input class="snacki-input" name="nombre" autocomplete="name" [attr.aria-label]="tipoCuenta === 'comercio' ? 'Nombre del comercio' : 'Nombre de Usuario'" [placeholder]="tipoCuenta === 'comercio' ? 'Nombre comercial' : 'Agregar Nombre y Apellido.'" [(ngModel)]="form.nombre"></ion-input>
 
-    <label class="snacki-label">Edad:</label>
-    <ion-input class="snacki-input" name="edad" type="number" inputmode="numeric" min="18" max="120" step="1" aria-label="Edad" placeholder="Debes tener 18 años o más" [(ngModel)]="form.edad"></ion-input>
+    @if (tipoCuenta === 'cliente') {
+      <label class="snacki-label">Edad:</label>
+      <ion-input class="snacki-input" name="edad" type="number" inputmode="numeric" min="18" max="120" step="1" aria-label="Edad" placeholder="Debes tener 18 años o más" [(ngModel)]="form.edad"></ion-input>
+    } @else {
+      <label class="snacki-label">Comercio asociado:</label>
+      <ion-select class="snacki-input" name="comercioId" aria-label="Comercio asociado" placeholder="Selecciona tu comercio" [(ngModel)]="form.comercioId">
+        @for (local of locales; track local.id) { <ion-select-option [value]="local.id">{{ local.nombre }}</ion-select-option> }
+      </ion-select>
+    }
 
     <label class="snacki-label">Contraseña:</label>
     <div class="with-icon">
@@ -34,8 +47,8 @@
     <label class="snacki-label">Correo Electronico:</label>
     <ion-input class="snacki-input" name="correo" type="email" autocomplete="email" aria-label="Correo Electronico" placeholder="Agregar Correo Electronico" [(ngModel)]="form.correo"></ion-input>
 
-    <label class="snacki-label">Cedula o R.U.C.:</label>
-    <ion-input class="snacki-input" name="cedula" inputmode="numeric" aria-label="Cedula o R.U.C." placeholder="Agregar Cedula o R.U.C" [(ngModel)]="form.cedula"></ion-input>
+    <label class="snacki-label">{{ tipoCuenta === 'comercio' ? 'R.U.C. del comercio:' : 'Cédula:' }}</label>
+    <ion-input class="snacki-input" name="cedula" inputmode="numeric" [attr.aria-label]="tipoCuenta === 'comercio' ? 'R.U.C. del comercio' : 'Cédula'" [placeholder]="tipoCuenta === 'comercio' ? 'Agregar R.U.C.' : 'Agregar Cédula'" [(ngModel)]="form.cedula"></ion-input>
 
     <ion-checkbox class="snacki-check" labelPlacement="end" justify="start" [(ngModel)]="form.acepta" name="acepta">
       He leido y aceptado los terminos y condiciones del servicio.
