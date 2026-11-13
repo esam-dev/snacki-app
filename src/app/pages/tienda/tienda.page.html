@@ -1,0 +1,32 @@
+<ion-content class="snacki-page" [fullscreen]="true">
+  <app-snacki-header></app-snacki-header>
+  <app-inicio-bar></app-inicio-bar>
+
+  @if (local) {
+    <section class="store-banner snacki-card">
+      <img [src]="local.logo" [alt]="local.nombre" />
+      <div class="text">
+        <div class="store-name">{{ local.nombre }}</div>
+        <div class="store-pts">Pts. Asociados: {{ local.puntos | number }} PTS</div>
+      </div>
+      <ion-button class="snacki-btn small" (click)="mostrarQr()">Escanear compra</ion-button>
+    </section>
+
+    @if (local.productos.length) {
+      <div class="item-grid">
+        @for (p of local.productos; track p.nombre) {
+          <article class="item-card">
+            <div class="media"><img [src]="p.imagen" [alt]="p.nombre" /></div>
+            <div class="info">
+              <div class="name">{{ p.nombre }}</div>
+              <div class="pts">{{ p.puntos | number }} PTS</div>
+              <ion-button class="snacki-btn redeem-btn" size="small" (click)="canjear(p)">Canjear</ion-button>
+            </div>
+          </article>
+        }
+      </div>
+    } @else {
+      <p class="empty">Este local aún no tiene ofertas disponibles.</p>
+    }
+  }
+</ion-content>

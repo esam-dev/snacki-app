@@ -1,2 +1,17 @@
-// For information on how to create your own theme, please refer to:
-// https://ionicframework.com/docs/theming/
+:root {
+  --ion-font-family: 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  --ion-background-color: #ffffff;
+  --ion-text-color: #000000;
+
+  --ion-color-primary: #357bff;
+  --ion-color-primary-rgb: 53, 123, 255;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #2f6ce0;
+  --ion-color-primary-tint: #4988ff;
+
+  --snacki-input-bg: #f2f1f6;
+  --snacki-card-media: #e6e6e6;
+  --snacki-danger: #ff3b3b;
+  --snacki-back: #0a84ff;
+}

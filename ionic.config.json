@@ -1,8 +1,8 @@
-﻿{
-  \"name\": \"snacki-app\",
-  \"app_id\": \"com.snacki.app\",
-  \"type\": \"angular-standalone\",
-  \"integrations\": {
-    \"capacitor\": {}
-  }
+{
+  "name": "snacki-app",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular-standalone",
+  "id": "com.snacki.app"
 }

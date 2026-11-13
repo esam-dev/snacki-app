@@ -1,0 +1,86 @@
+<ion-content class="snacki-page home-page" [fullscreen]="true">
+  <div class="home-top">
+    <app-snacki-header></app-snacki-header>
+    <div class="home-shortcuts" aria-label="Accesos próximos">
+      <span class="home-shortcut" role="img" aria-label="Notificaciones" title="Notificaciones">
+        <ion-icon name="notifications-outline" aria-hidden="true"></ion-icon>
+      </span>
+      <span class="home-shortcut" role="img" aria-label="Mapa de comercios" title="Mapa de comercios">
+        <ion-icon name="location-outline" aria-hidden="true"></ion-icon>
+      </span>
+    </div>
+  </div>
+
+  <section class="welcome-row">
+    <div>
+      <h1>¡Hola, {{ nombreUsuario }}!</h1>
+      <p class="welcome-copy">Tus puntos y comercios favoritos, en un solo lugar.</p>
+    </div>
+  </section>
+
+  <section class="wallet-card" aria-label="Resumen de puntos">
+    <div class="wallet-label">Saldo total</div>
+    <div class="wallet-points"><strong>{{ total | number }}</strong><span>PTS</span></div>
+    <div class="wallet-footer">
+      <span>Reunidos en {{ locales.length }} comercios</span>
+      <button type="button" (click)="irA('/tabs/puntos')">Ver puntos <span aria-hidden="true">›</span></button>
+    </div>
+  </section>
+
+  <button class="scan-card" type="button" (click)="irA('/tabs/qr')">
+    <span class="scan-icon"><ion-icon name="qr-code-outline"></ion-icon></span>
+    <span class="scan-copy">
+      <strong>Escanea el QR del comercio</strong>
+      <small>Descubre recompensas que puedes canjear con tus puntos</small>
+    </span>
+    <span class="scan-arrow" aria-hidden="true">›</span>
+  </button>
+
+  <ion-searchbar
+    class="home-search"
+    placeholder="Buscar comercios"
+    [debounce]="200"
+    (ionInput)="filtrar($event)"
+  ></ion-searchbar>
+
+  <section class="home-section">
+    <div class="section-heading">
+      <div><h2>Tus comercios</h2></div>
+      <button type="button" (click)="irA('/tabs/explorar')">Ver todos</button>
+    </div>
+
+    <div class="merchant-list">
+      @for (local of resultados; track local.id) {
+        <button class="merchant-card" type="button" (click)="abrirComercio(local)">
+          <span class="merchant-logo"><img [src]="local.logo" [alt]="local.nombre" /></span>
+          <strong>{{ local.nombre }}</strong>
+          <span class="merchant-points">{{ local.puntos | number }} PTS</span>
+        </button>
+      } @empty {
+        <p class="empty">No encontramos comercios con ese nombre.</p>
+      }
+    </div>
+  </section>
+
+  @if (ofertas.length) {
+    <section class="home-section rewards-section">
+      <div class="section-heading">
+        <div><p class="eyebrow">RECOMPENSAS DISPONIBLES</p><h2>Canjea tus puntos</h2></div>
+        <button type="button" (click)="irA('/tabs/explorar')">Explorar</button>
+      </div>
+
+      <div class="reward-list">
+        @for (oferta of ofertas; track oferta.nombre) {
+          <button class="reward-card" type="button" (click)="abrirOferta(oferta)">
+            <span class="reward-image"><img [src]="oferta.imagen" [alt]="oferta.nombre" /></span>
+            <span class="reward-details">
+              <small>{{ oferta.comercio }}</small>
+              <strong>{{ oferta.nombre }}</strong>
+              <span>{{ oferta.puntos | number }} PTS</span>
+            </span>
+          </button>
+        }
+      </div>
+    </section>
+  }
+</ion-content>

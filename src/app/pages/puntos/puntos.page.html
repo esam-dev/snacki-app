@@ -1,0 +1,33 @@
+<ion-content class="snacki-page" [fullscreen]="true">
+  <app-snacki-header></app-snacki-header>
+  <app-inicio-bar></app-inicio-bar>
+
+  <section class="points-card snacki-card">
+    <div class="caption"><ion-icon name="card-outline"></ion-icon> Resumen de puntos de la cuenta</div>
+    <div class="value">{{ total | number }} PTS EN TOTAL</div>
+  </section>
+  <p class="demo-note">El saldo de cada comercio es independiente. En esta demo se guarda en este dispositivo; el comercio aún no tiene una vista sincronizada de tu saldo.</p>
+
+  <div class="rows">
+    @for (local of locales; track local.id) {
+      <div class="row">
+        <img [src]="local.logo" [alt]="local.nombre" />
+        <span class="name">{{ local.nombre }}</span>
+        <span class="detail">
+          Pts. Asociados: {{ local.puntos | number }} PTS
+          <small class="venc">Vencimiento: {{ local.vencimiento | date: 'dd/MM/yyyy' }}</small>
+        </span>
+      </div>
+    }
+  </div>
+
+  <h2 class="canjes-title">Movimientos recientes</h2>
+  @for (c of movimientos; track c.id) {
+    <div class="canje">
+      <span>{{ c.local }} · {{ c.descripcion }}</span>
+      <span [class.earned]="c.tipo === 'acumulacion'">{{ c.tipo === 'acumulacion' ? '+' : '-' }}{{ c.puntos | number }} PTS · {{ c.fecha | date: 'dd/MM/yyyy' }}</span>
+    </div>
+  } @empty {
+    <p class="empty-history">Aún no hay compras escaneadas ni canjes.</p>
+  }
+</ion-content>
