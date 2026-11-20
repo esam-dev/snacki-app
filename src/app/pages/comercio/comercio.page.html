@@ -13,7 +13,7 @@
       <ion-input class="snacki-input" name="nombreRecompensa" maxlength="60" placeholder="Ej. Café gratis" [(ngModel)]="nombreRecompensa"></ion-input>
       <label class="snacki-label">Costo en puntos</label>
       <ion-input class="snacki-input" name="costoPuntos" type="number" min="1" max="100000" step="1" inputmode="numeric" placeholder="Ej. 250" [(ngModel)]="costoPuntos"></ion-input>
-      <ion-button class="snacki-btn" expand="block" (click)="agregarRecompensa()">Agregar al catálogo</ion-button>
+      <ion-button class="snacki-btn" expand="block" [disabled]="agregando" (click)="agregarRecompensa()">Agregar al catálogo</ion-button>
     </section>
 
     <section class="rewards-list">

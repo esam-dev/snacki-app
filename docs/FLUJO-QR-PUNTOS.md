@@ -5,7 +5,7 @@
 - **Usuario final:** ve su wallet, escanea QR de compra y canjea recompensas con los puntos de cada comercio.
 - **Comercio:** se registra vinculado a un comercio y entra a su panel para agregar o quitar recompensas y definir su costo en puntos.
 
-La selección de rol del login y las rutas de cada experiencia están separadas en la app. En esta versión las cuentas, el catálogo y los saldos son locales y de demostración; no se debe tratar la selección de rol como un mecanismo de seguridad de producción.
+La selección de rol del login y las rutas de cada experiencia están separadas en la app. `roleGuard` redirige a `/login?returnUrl=...` cuando la cuenta activa no tiene el rol esperado, para volver al destino original tras iniciar sesión. En esta versión las cuentas, el catálogo y los saldos son locales y de demostración: esta separación es solo de UX, no un mecanismo de seguridad de producción.
 
 ## Recorrido del usuario
 
@@ -24,11 +24,19 @@ El escáner acepta el QR informativo `snacki://local/<comercio-id>` para abrir u
 snacki://purchase/<comercio-id>?id=<compra-unica>&points=<puntos>
 ```
 
-Ejemplo: `snacki://purchase/burger-house?id=compra-demo-001&points=25`. El mismo identificador no se puede acreditar dos veces. Saldos y movimientos se guardan en `localStorage` separados por la identidad local del usuario. Es una simulación de interfaz y no valida la compra ni comunica datos al comercio.
+Ejemplo: `snacki://purchase/burger-house?id=compra-demo-001&points=25`. La acreditación se deduplica con la clave `purchase:<comercio>:<compra>`: el mismo identificador de compra en un comercio distinto sí acredita. Los canjes usan el namespace `redeem:` separado, así que no colisionan con las compras. Es una simulación de interfaz y no valida la compra ni comunica datos al comercio.
+
+## Validación y estado local de la demo
+
+El QR se valida de forma estricta antes de acreditar: `points` debe ser un entero decimal entre 1 y 100000, `localId` debe cumplir `[a-z0-9-]+` y `purchaseId` tiene un tope de longitud. Las ofertas leídas del almacenamiento se revalidan y no admiten puntos negativos.
+
+Saldos y movimientos se guardan juntos en un único blob atómico `snacki.demo-state`, asociado al `id` estable de la identidad local (no al correo). Al arrancar se migran los datos de las claves antiguas `snacki.point-balances` y `snacki.point-movements`. Las escrituras son atómicas: si fallan, la operación informa del error en vez de fingir que se guardó. Los mapas indexados se crean sin prototipo (`Object.create(null)`) y se validan al leer, de modo que identificadores como `__proto__` no corrompan el estado.
+
+El inicio de sesión y el registro guardan un hash de contraseña solo de demostración: no es criptográfico y no es apto para producción. Estas mejoras refuerzan la maqueta local; no sustituyen los requisitos de la sección siguiente.
 
 ## Integración requerida antes de operar con comercios reales
 
-La app actual no incluye servidor, sesión autenticada segura, panel de comercio ni sincronización. `points` del QR de demo no se debe aceptar como fuente confiable en producción.
+La app actual no incluye servidor, sesión autenticada segura ni sincronización entre dispositivos. `points` del QR de demo no se debe aceptar como fuente confiable en producción.
 
 Para el flujo real:
 

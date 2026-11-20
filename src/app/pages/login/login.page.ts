@@ -1,6 +1,6 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { IonButton, IonContent, IonIcon, IonInput, ToastController } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { eyeOffOutline, eyeOutline, lockClosedOutline, personOutline, storefrontOutline } from 'ionicons/icons';
@@ -14,8 +14,11 @@ import { AuthService, TipoCuenta } from '../../services/auth.service';
 })
 export class LoginPage implements OnInit {
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private toast = inject(ToastController);
   private auth = inject(AuthService);
+
+  private returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') ?? '';
 
   usuario = '';
   password = '';
@@ -28,17 +31,20 @@ export class LoginPage implements OnInit {
   }
 
   ngOnInit() {
-    if (this.auth.currentUser) this.irAlInicio();
+    // Si ya hay sesión, volvemos a la home del rol: reutilizar un returnUrl aquí
+    // podría generar un bucle con el guard cuando el rol no coincide.
+    if (this.auth.currentUser) this.router.navigateByUrl(this.homePorRol());
   }
 
   async iniciarSesion() {
     if (this.cargando) return;
 
     if (!this.auth.iniciarSesion(this.usuario, this.password, this.tipoCuenta)) {
+      const mensaje = !this.usuario.trim() || !this.password.trim()
+        ? 'Completa tu usuario y contraseña'
+        : 'Credenciales o tipo de cuenta incorrectos. Revisa el tipo seleccionado e inténtalo de nuevo.';
       const t = await this.toast.create({
-        message: this.usuario.trim() && this.password.trim()
-          ? 'Revisa el tipo de cuenta o regístrate como comercio si aún no tienes un perfil comercial.'
-          : 'Completa tu usuario y contraseña para continuar.',
+        message: mensaje,
         duration: 2200,
         color: 'danger',
         position: 'bottom',
@@ -61,10 +67,25 @@ export class LoginPage implements OnInit {
   }
 
   registrarse() {
-    this.router.navigate(['/register'], { queryParams: { tipo: this.tipoCuenta } });
+    this.router.navigate(['/register'], {
+      queryParams: {
+        tipo: this.tipoCuenta,
+        ...(this.returnUrl ? { returnUrl: this.returnUrl } : {}),
+      },
+    });
   }
 
   private irAlInicio() {
-    this.router.navigateByUrl(this.auth.currentUser?.tipo === 'comercio' ? '/comercio' : '/tabs/home');
+    this.router.navigateByUrl(this.destinoSeguro());
+  }
+
+  private destinoSeguro(): string {
+    // Evitamos open redirect: solo rutas internas absolutas de un solo slash.
+    if (!this.returnUrl.startsWith('/') || this.returnUrl.startsWith('//')) return this.homePorRol();
+    return this.returnUrl;
+  }
+
+  private homePorRol(): string {
+    return this.auth.currentUser?.tipo === 'comercio' ? '/comercio' : '/tabs/home';
   }
 }

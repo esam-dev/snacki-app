@@ -2,9 +2,11 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService, TipoCuenta } from './auth.service';
 
-/** Guard de navegación para separar las dos experiencias locales de la demo. */
-export const roleGuard = (tipo: TipoCuenta): CanActivateFn => () => {
+/** Separación de UX de la demo, no una medida de seguridad. */
+export const roleGuard = (tipo: TipoCuenta): CanActivateFn => (_route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
-  return auth.currentUser?.tipo === tipo ? true : router.parseUrl('/login');
+  return auth.currentUser?.tipo === tipo
+    ? true
+    : router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
 };

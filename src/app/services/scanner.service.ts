@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+﻿import { Injectable } from '@angular/core';
 import { Capacitor } from '@capacitor/core';
 import { BarcodeFormat, BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 
@@ -36,7 +36,7 @@ export class ScannerService {
 
   /** QR informativo: snacki://local/<id>. */
   extraerLocalId(valor: string): string | null {
-    const match = /^snacki:\/\/local\/([a-z0-9-]+)$/i.exec(valor.trim());
+    const match = /^snacki:\/\/local\/([a-z0-9-]+)$/.exec(valor.trim());
     return match?.[1] ?? null;
   }
 
@@ -46,9 +46,16 @@ export class ScannerService {
       const url = new URL(valor.trim());
       if (url.protocol !== 'snacki:' || url.hostname !== 'purchase') return null;
       const localId = url.pathname.replace(/^\//, '');
-      const purchaseId = url.searchParams.get('id') || '';
-      const puntos = Number(url.searchParams.get('points'));
-      if (!localId || !purchaseId || !Number.isSafeInteger(puntos) || puntos <= 0) return null;
+      if (!/^[a-z0-9-]+$/.test(localId)) return null;
+
+      const purchaseId = (url.searchParams.get('id') || '').trim();
+      if (!purchaseId || purchaseId.length > 120) return null;
+
+      const rawPoints = url.searchParams.get('points');
+      if (rawPoints === null || !/^\d+$/.test(rawPoints)) return null;
+      const puntos = Number(rawPoints);
+      if (!Number.isSafeInteger(puntos) || puntos < 1 || puntos > 100000) return null;
+
       return { localId, purchaseId, puntos };
     } catch {
       return null;

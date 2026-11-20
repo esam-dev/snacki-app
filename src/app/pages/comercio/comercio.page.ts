@@ -21,21 +21,30 @@ export class ComercioPage {
 
   comercio?: Local = this.stores.getById(this.auth.currentUser?.comercioId);
   nombreRecompensa = '';
-  costoPuntos: number | null = null;
+  costoPuntos: number | string | null = null;
+  agregando = false;
 
   ionViewWillEnter() {
     this.comercio = this.stores.getById(this.auth.currentUser?.comercioId);
   }
 
   async agregarRecompensa() {
-    if (!this.comercio || !this.costoPuntos || !this.stores.agregarRecompensa(this.comercio.id, this.nombreRecompensa, Number(this.costoPuntos))) {
-      await this.mostrar('Revisa el nombre y el costo en puntos. No repitas el nombre de otra recompensa.');
-      return;
+    if (this.agregando) return;
+    this.agregando = true;
+    try {
+      const puntos = Number(this.costoPuntos);
+      const costoValido = Number.isInteger(puntos) && puntos > 0 && puntos <= 100000;
+      if (!this.comercio || !costoValido || !this.stores.agregarRecompensa(this.comercio.id, this.nombreRecompensa, puntos)) {
+        await this.mostrar('Revisa el nombre y el costo en puntos. No repitas el nombre de otra recompensa.');
+        return;
+      }
+      this.nombreRecompensa = '';
+      this.costoPuntos = null;
+      this.comercio = this.stores.getById(this.comercio.id);
+      await this.mostrar('Recompensa agregada al catálogo.');
+    } finally {
+      this.agregando = false;
     }
-    this.nombreRecompensa = '';
-    this.costoPuntos = null;
-    this.comercio = this.stores.getById(this.comercio.id);
-    await this.mostrar('Recompensa agregada al catálogo.');
   }
 
   async eliminarRecompensa(producto: Producto) {

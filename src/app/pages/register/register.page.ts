@@ -21,6 +21,8 @@ export class RegisterPage {
   private route = inject(ActivatedRoute);
   private stores = inject(StoreService);
 
+  private returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') ?? '';
+
   tipoCuenta: 'cliente' | 'comercio' = this.route.snapshot.queryParamMap.get('tipo') === 'comercio' ? 'comercio' : 'cliente';
   locales = this.stores.getAll();
 
@@ -55,10 +57,31 @@ export class RegisterPage {
       await t.present();
       return;
     }
-    this.auth.registrar(f.nombre, f.correo, this.tipoCuenta, f.comercioId || undefined);
-    this.router.navigateByUrl(this.tipoCuenta === 'comercio' ? '/comercio' : '/tabs/home');
+
+    const creado = this.auth.registrar(f.nombre, f.correo, f.password, this.tipoCuenta, f.comercioId || undefined);
+    if (!creado) {
+      const t = await this.toast.create({
+        message: 'No se pudo crear la cuenta. Es posible que el correo ya esté registrado.',
+        duration: 2200,
+        color: 'danger',
+      });
+      await t.present();
+      return;
+    }
+
+    this.router.navigateByUrl(this.destinoSeguro());
   }
 
   /** Pendiente: integrar @capacitor/camera para elegir/tomar la foto de perfil. */
   agregarFoto() {}
+
+  private destinoSeguro(): string {
+    // Evitamos open redirect: solo rutas internas absolutas de un solo slash.
+    if (!this.returnUrl.startsWith('/') || this.returnUrl.startsWith('//')) return this.homePorRol();
+    return this.returnUrl;
+  }
+
+  private homePorRol(): string {
+    return this.tipoCuenta === 'comercio' ? '/comercio' : '/tabs/home';
+  }
 }
