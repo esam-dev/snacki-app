@@ -1,4 +1,4 @@
-<ion-content class="snacki-page" [fullscreen]="true">
+﻿<ion-content class="snacki-page" [fullscreen]="true">
   <app-snacki-header [back]="true"></app-snacki-header>
 
   <h1 class="register-title">{{ tipoCuenta === 'comercio' ? 'Registra tu comercio' : 'Crea tu cuenta Snacki' }}</h1>
@@ -23,14 +23,17 @@
       <ion-input class="snacki-input" name="edad" type="number" inputmode="numeric" min="18" max="120" step="1" aria-label="Edad" placeholder="Debes tener 18 años o más" [(ngModel)]="form.edad"></ion-input>
     } @else {
       <label class="snacki-label">Comercio asociado:</label>
-      <ion-select class="snacki-input" name="comercioId" aria-label="Comercio asociado" placeholder="Selecciona tu comercio" [(ngModel)]="form.comercioId">
-        @for (local of locales; track local.id) { <ion-select-option [value]="local.id">{{ local.nombre }}</ion-select-option> }
+      <ion-select class="snacki-input" name="comercioId" aria-label="Comercio asociado" [placeholder]="cargandoLocales ? 'Cargando comercios...' : 'Selecciona tu comercio'" [(ngModel)]="form.comercioId" [disabled]="cargandoLocales">
+        @for (local of locales; track local.id) { <ion-select-option [value]="local.id">{{ local.name }}</ion-select-option> }
       </ion-select>
+      @if (!cargandoLocales && locales.length === 0) {
+        <p class="snacki-hint">No hay comercios disponibles. Verifica que el backend esté activo.</p>
+      }
     }
 
     <label class="snacki-label">Contraseña:</label>
     <div class="with-icon">
-      <ion-input class="snacki-input" name="password" [type]="verPassword ? 'text' : 'password'" autocomplete="new-password" aria-label="Contraseña" placeholder="Agregar Contraseña" [(ngModel)]="form.password"></ion-input>
+      <ion-input class="snacki-input" name="password" [type]="verPassword ? 'text' : 'password'" autocomplete="new-password" aria-label="Contraseña" placeholder="Mínimo 8 caracteres" [(ngModel)]="form.password"></ion-input>
       <button type="button" class="eye" (click)="verPassword = !verPassword" [attr.aria-label]="verPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'">
         <ion-icon aria-hidden="true" [name]="verPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
       </button>
@@ -55,7 +58,7 @@
     </ion-checkbox>
 
     <div class="center">
-      <ion-button class="snacki-btn" shape="round" type="submit">Registrarse</ion-button>
+      <ion-button class="snacki-btn" shape="round" type="submit" [disabled]="enviando">{{ enviando ? 'Registrando...' : 'Registrarse' }}</ion-button>
     </div>
   </form>
 </ion-content>

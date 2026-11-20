@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+﻿import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { IonButton, IonContent, IonIcon, IonInput, ToastController } from '@ionic/angular';
@@ -31,39 +31,39 @@ export class LoginPage implements OnInit {
   }
 
   ngOnInit() {
-    // Si ya hay sesión, volvemos a la home del rol: reutilizar un returnUrl aquí
-    // podría generar un bucle con el guard cuando el rol no coincide.
-    if (this.auth.currentUser) this.router.navigateByUrl(this.homePorRol());
+    void this.verificarSesion();
+  }
+
+  private async verificarSesion() {
+    await this.auth.ensureSessionResolved();
+    if (this.auth.currentUser) {
+      this.router.navigateByUrl(this.homePorRol());
+    }
   }
 
   async iniciarSesion() {
     if (this.cargando) return;
 
-    if (!this.auth.iniciarSesion(this.usuario, this.password, this.tipoCuenta)) {
-      const mensaje = !this.usuario.trim() || !this.password.trim()
-        ? 'Completa tu usuario y contraseña'
-        : 'Credenciales o tipo de cuenta incorrectos. Revisa el tipo seleccionado e inténtalo de nuevo.';
-      const t = await this.toast.create({
-        message: mensaje,
-        duration: 2200,
-        color: 'danger',
-        position: 'bottom',
-      });
-      await t.present();
+    if (!this.usuario.trim() || !this.password.trim()) {
+      await this.mostrarToast('Completa tu usuario/correo y contraseña', 'danger');
       return;
     }
+
     this.cargando = true;
-    await new Promise((resolve) => window.setTimeout(resolve, 2000));
-    this.irAlInicio();
+    try {
+      const result = await this.auth.login(this.usuario, this.password, this.tipoCuenta);
+      if (!result.success) {
+        await this.mostrarToast(result.message || 'Credenciales o tipo de cuenta incorrectos.', 'danger');
+        return;
+      }
+      this.irAlInicio();
+    } finally {
+      this.cargando = false;
+    }
   }
 
   async olvideContrasena() {
-    const t = await this.toast.create({
-      message: 'Función de recuperación de contraseña próximamente.',
-      duration: 2000,
-      position: 'bottom',
-    });
-    await t.present();
+    await this.mostrarToast('Función de recuperación de contraseña próximamente.', 'medium');
   }
 
   registrarse() {
@@ -80,12 +80,16 @@ export class LoginPage implements OnInit {
   }
 
   private destinoSeguro(): string {
-    // Evitamos open redirect: solo rutas internas absolutas de un solo slash.
     if (!this.returnUrl.startsWith('/') || this.returnUrl.startsWith('//')) return this.homePorRol();
     return this.returnUrl;
   }
 
   private homePorRol(): string {
     return this.auth.currentUser?.tipo === 'comercio' ? '/comercio' : '/tabs/home';
+  }
+
+  private async mostrarToast(message: string, color: 'danger' | 'medium' | 'success' = 'medium') {
+    const t = await this.toast.create({ message, duration: 2200, color, position: 'bottom' });
+    await t.present();
   }
 }
