@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+﻿import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
 import { Router } from '@angular/router';
@@ -56,8 +56,8 @@ export class ComercioPage {
     await this.mostrar('Recompensa eliminada.');
   }
 
-  cerrarSesion() {
-    this.auth.cerrarSesion();
+  async cerrarSesion() {
+    await this.auth.cerrarSesion();
     this.router.navigateByUrl('/login');
   }
 

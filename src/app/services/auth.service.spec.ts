@@ -1,94 +1,104 @@
-import { TestBed } from '@angular/core/testing';
+﻿import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
+import { TokenStorageService } from './token-storage.service';
 
-function crearAuth(): AuthService {
-  TestBed.resetTestingModule();
-  TestBed.configureTestingModule({ providers: [AuthService] });
-  return TestBed.inject(AuthService);
+class TokenStorageServiceMock {
+  private token: string | null = null;
+  async setToken(token: string): Promise<void> { this.token = token; }
+  async getToken(): Promise<string | null> { return this.token; }
+  async clear(): Promise<void> { this.token = null; }
 }
 
-describe('AuthService', () => {
+function setup() {
+  TestBed.resetTestingModule();
+  localStorage.clear();
+  TestBed.configureTestingModule({
+    providers: [
+      AuthService,
+      { provide: TokenStorageService, useClass: TokenStorageServiceMock },
+      provideHttpClient(),
+      provideHttpClientTesting(),
+    ],
+  });
+  return {
+    auth: TestBed.inject(AuthService),
+    httpMock: TestBed.inject(HttpTestingController),
+    tokenStorage: TestBed.inject(TokenStorageService) as unknown as TokenStorageServiceMock,
+  };
+}
+
+describe('AuthService (backend auth)', () => {
   beforeEach(() => {
     localStorage.clear();
-    TestBed.resetTestingModule();
   });
 
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    try { TestBed.inject(HttpTestingController).verify(); } catch {}
+    vi.restoreAllMocks();
+  });
 
-  it('registra y autentica con el hash demo de la contrasena', () => {
-    const auth = crearAuth();
+  it('login exitoso guarda token y establece usuario', async () => {
+    const { auth, httpMock, tokenStorage } = setup();
+    const promise = auth.login('ana@example.com', 'secreto123', 'cliente');
 
-    expect(auth.registrar('Ana Perez', 'ana@example.com', 'secreto123', 'cliente')).toBe(true);
-    expect(auth.iniciarSesion('ana@example.com', 'secreto123', 'cliente')).toBe(true);
+    const req = httpMock.expectOne(`${environment.apiBaseUrl}/api/auth/login`);
+    expect(req.request.method).toBe('POST');
+    req.flush({
+      data: {
+        user: { id: 'u1', fullName: 'Ana Perez', email: 'ana@example.com', isActive: true },
+        membership: { role: 'cliente', tenantId: 't1', tenantSlug: 'snacki', tenantName: 'Snacki' },
+        auth: { accessToken: 'jwt-token', tokenType: 'Bearer', expiresIn: 3600 },
+      },
+    });
+
+    const result = await promise;
+    expect(result.success).toBe(true);
     expect(auth.currentUser?.correo).toBe('ana@example.com');
-    expect(auth.currentUser?.id).toBeTruthy();
+    expect(auth.currentUser?.tipo).toBe('cliente');
+    expect(await tokenStorage.getToken()).toBe('jwt-token');
   });
 
-  it('rechaza una contrasena incorrecta', () => {
-    const auth = crearAuth();
+  it('login inválido retorna error sin autenticar', async () => {
+    const { auth, httpMock } = setup();
+    const promise = auth.login('ana@example.com', 'bad', 'cliente');
 
-    expect(auth.registrar('Ana Perez', 'ana2@example.com', 'secreto123', 'cliente')).toBe(true);
-    expect(auth.iniciarSesion('ana2@example.com', 'incorrecta', 'cliente')).toBe(false);
-  });
+    const req = httpMock.expectOne(`${environment.apiBaseUrl}/api/auth/login`);
+    req.flush({ error: { code: 'INVALID_CREDENTIALS', message: 'Credenciales inválidas' } }, { status: 401, statusText: 'Unauthorized' });
 
-  it('falla el login cuando el tipo solicitado no coincide con el perfil', () => {
-    const auth = crearAuth();
-
-    expect(auth.registrar('Ana Perez', 'ana3@example.com', 'secreto123', 'cliente')).toBe(true);
-    expect(auth.iniciarSesion('ana3@example.com', 'secreto123', 'comercio')).toBe(false);
-  });
-
-  it('rechaza el registro de comercio sin comercioId', () => {
-    const auth = crearAuth();
-
-    expect(auth.registrar('Tienda', 'sin-id@example.com', 'secreto123', 'comercio')).toBe(false);
-  });
-
-  it('no restaura una sesion de comercio sin comercioId', () => {
-    localStorage.setItem('snacki.current-user', JSON.stringify({
-      id: 'com-legacy',
-      nombre: 'Tienda Legacy',
-      correo: 'legacy-comercio@example.com',
-      tipo: 'comercio',
-    }));
-
-    const auth = crearAuth();
+    const result = await promise;
+    expect(result.success).toBe(false);
     expect(auth.currentUser).toBeNull();
   });
 
-  it('persiste id y comercioId al registrar un comercio', () => {
-    const auth = crearAuth();
+  it('restoreSession con token válido hidrata usuario desde /me', async () => {
+    const { auth, httpMock, tokenStorage } = setup();
+    await tokenStorage.setToken('jwt-token');
 
-    expect(auth.registrar('Burger House', 'burger@example.com', 'secreto123', 'comercio', 'burger-house')).toBe(true);
-    expect(auth.currentUser?.id).toBeTruthy();
+    const promise = auth.restoreSession();
+    const req = httpMock.expectOne(`${environment.apiBaseUrl}/api/auth/me`);
+    expect(req.request.headers.get('Authorization')).toBeNull(); // interceptor not registered in this testbed; request still made
+    req.flush({
+      data: {
+        user: { id: 'u1', fullName: 'Ana Perez', email: 'ana@example.com', isActive: true },
+        membership: { role: 'comercio', tenantId: 't2', tenantSlug: 'burger-house', tenantName: 'Burger House' },
+        session: {},
+      },
+    });
+
+    await promise;
     expect(auth.currentUser?.tipo).toBe('comercio');
     expect(auth.currentUser?.comercioId).toBe('burger-house');
-
-    const recargado = crearAuth();
-    expect(recargado.currentUser?.id).toBeTruthy();
-    expect(recargado.currentUser?.comercioId).toBe('burger-house');
   });
 
-  it('rechaza un correo duplicado entre roles distintos', () => {
-    const auth = crearAuth();
-
-    expect(auth.registrar('Cliente', 'duplicado@example.com', 'secreto123', 'cliente')).toBe(true);
-    expect(auth.registrar('Comercio', 'duplicado@example.com', 'secreto123', 'comercio', 'burger-house')).toBe(false);
-  });
-
-  it('normaliza una sesion legacy sin id', () => {
-    localStorage.setItem('snacki.current-user', JSON.stringify({
-      nombre: 'Legacy User',
-      correo: 'legacy@example.com',
-      tipo: 'cliente',
-    }));
-
-    const auth = crearAuth();
-
-    expect(auth.currentUser).not.toBeNull();
-    expect(typeof auth.currentUser?.id).toBe('string');
-    expect(auth.currentUser?.id).toBeTruthy();
-    expect(auth.currentUser?.nombre).toBe('Legacy User');
+  it('restoreSession sin token queda anónimo', async () => {
+    const { auth, httpMock } = setup();
+    await auth.restoreSession();
+    httpMock.expectNone(`${environment.apiBaseUrl}/api/auth/me`);
+    expect(auth.currentUser).toBeNull();
+    expect(auth.authStatus()).toBe('anonymous');
   });
 });

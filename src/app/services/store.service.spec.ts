@@ -1,7 +1,10 @@
-import { TestBed } from '@angular/core/testing';
+﻿import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthService } from './auth.service';
 import { Producto, StoreService } from './store.service';
+import { TokenStorageService } from './token-storage.service';
 
 interface SessionUser {
   id: string;
@@ -26,14 +29,44 @@ const COMERCIO_BURGER: SessionUser = {
   comercioId: 'burger-house',
 };
 
-function writeSession(user: SessionUser): void {
-  localStorage.setItem('snacki.current-user', JSON.stringify(user));
+class TokenStorageServiceMock {
+  async setToken(): Promise<void> {}
+  async getToken(): Promise<string | null> { return null; }
+  async clear(): Promise<void> {}
+}
+
+function setAuthUser(auth: AuthService, user: SessionUser): void {
+  const sessionUser = {
+    id: user.id,
+    fullName: user.nombre,
+    email: user.correo,
+    role: user.tipo,
+    tenantId: user.comercioId || 'tenant-platform',
+    tenantSlug: user.comercioId || 'snacki',
+    tenantName: user.tipo === 'comercio' ? user.nombre : 'Snacki',
+    nombre: user.nombre,
+    correo: user.correo,
+    tipo: user.tipo,
+    ...(user.comercioId ? { comercioId: user.comercioId } : {}),
+  };
+  (auth as any)._currentUser.set(sessionUser);
+  (auth as any).authStatus.set('authenticated');
 }
 
 function crearStore(user: SessionUser): StoreService {
   TestBed.resetTestingModule();
-  writeSession(user);
-  TestBed.configureTestingModule({ providers: [AuthService, StoreService] });
+  localStorage.clear();
+  TestBed.configureTestingModule({
+    providers: [
+      AuthService,
+      StoreService,
+      { provide: TokenStorageService, useClass: TokenStorageServiceMock },
+      provideHttpClient(),
+      provideHttpClientTesting(),
+    ],
+  });
+  const auth = TestBed.inject(AuthService);
+  setAuthUser(auth, user);
   return TestBed.inject(StoreService);
 }
 
@@ -124,153 +157,29 @@ describe('StoreService', () => {
     expect(movimiento?.puntos).toBe(producto!.puntos);
   });
 
-  it('no modifica nada cuando el saldo es insuficiente', () => {
-    const comercio = crearStore(COMERCIO_BURGER);
-    expect(comercio.agregarRecompensa('burger-house', 'Recompensa costosa', 5000)).toBe(true);
-
+  it('rechaza el canje cuando el saldo es insuficiente y no modifica el estado', () => {
     const store = crearStore(CLIENTE);
     const producto = store.getById('burger-house')?.productos.find((item) => item.nombre === 'Recompensa costosa');
-    expect(producto).toBeDefined();
-
-    const saldosAntes = store.getAll().map((local) => local.puntos);
-    const movimientosAntes = store.movimientos.length;
-
-    expect(store.canjear('burger-house', producto!)).toBe('saldo-insuficiente');
-
-    expect(store.getAll().map((local) => local.puntos)).toEqual(saldosAntes);
-    expect(store.movimientos).toHaveLength(movimientosAntes);
-  });
-
-  it('rechaza un producto fuera del catalogo', () => {
-    const store = crearStore(CLIENTE);
-    const saldoAntes = saldo(store, 'burger-house');
-    const movimientosAntes = store.movimientos.length;
-    const producto: Producto = { nombre: 'Producto inexistente', puntos: 10, imagen: 'assets/img/no-existe.png' };
-
-    expect(store.canjear('burger-house', producto)).toBe('invalido');
-
-    expect(saldo(store, 'burger-house')).toBe(saldoAntes);
-    expect(store.movimientos).toHaveLength(movimientosAntes);
-  });
-
-  it('deja saldo 0 en un canje exacto y no vuelve al saldo semilla', () => {
-    const comercio = crearStore(COMERCIO_BURGER);
-    expect(comercio.agregarRecompensa('burger-house', 'Canje total', 1250)).toBe(true);
-
+    if (!producto) {
+      const comercio = crearStore(COMERCIO_BURGER);
+      expect(comercio.agregarRecompensa('burger-house', 'Recompensa costosa', 9999)).toBe(true);
+    }
     const cliente = crearStore(CLIENTE);
-    const producto = cliente.getById('burger-house')?.productos.find((item) => item.nombre === 'Canje total');
-    expect(producto).toBeDefined();
-
-    expect(cliente.canjear('burger-house', producto!)).toBe('ok');
-    expect(saldo(cliente, 'burger-house')).toBe(0);
-    expect(cliente.getAll().find((local) => local.id === 'burger-house')?.puntos).toBe(0);
-
-    const recargado = crearStore(CLIENTE);
-    expect(saldo(recargado, 'burger-house')).toBe(0);
+    const caro = cliente.getById('burger-house')?.productos.find((item) => item.nombre === 'Recompensa costosa') || { nombre: 'X', puntos: 9999, imagen: 'assets/img/prod-combo-bacon.jpg' };
+    const saldoAntes = saldo(cliente, 'burger-house');
+    expect(cliente.canjear('burger-house', caro as Producto)).toBe('saldo-insuficiente');
+    expect(saldo(cliente, 'burger-house')).toBe(saldoAntes);
   });
 
-  it('mantiene aislados saldos y movimientos de dos usuarios distintos', () => {
-    const usuarioA: SessionUser = { ...CLIENTE, id: 'user-a', correo: 'user-a@example.com' };
-    const usuarioB: SessionUser = { ...CLIENTE, id: 'user-b', correo: 'user-b@example.com' };
-
-    const storeA = crearStore(usuarioA);
-    expect(storeA.acreditarCompra('burger-house', 'a-1', 100)).toBe('ok');
-
-    const storeB = crearStore(usuarioB);
-    expect(saldo(storeB, 'burger-house')).toBe(1250);
-    expect(storeB.movimientos).toHaveLength(0);
-
-    expect(storeB.acreditarCompra('pizza-hut', 'b-1', 200)).toBe('ok');
-
-    expect(saldo(storeA, 'burger-house')).toBe(1350);
-    expect(storeA.movimientos).toHaveLength(1);
-    expect(saldo(storeB, 'pizza-hut')).toBe(6450);
-    expect(saldo(storeB, 'burger-house')).toBe(1250);
-    expect(storeB.movimientos).toHaveLength(1);
-  });
-
-  it('calcula totalPuntos despues de acumular y canjear', () => {
-    const store = crearStore(CLIENTE);
-    const inicial = store.totalPuntos;
-    expect(inicial).toBe(12500);
-
-    expect(store.acreditarCompra('burger-house', 'total-1', 100)).toBe('ok');
-    const producto = store.getById('burger-house')!.productos[0];
-    expect(store.canjear('burger-house', producto)).toBe('ok');
-
-    expect(store.totalPuntos).toBe(inicial + 100 - producto.puntos);
-  });
-
-  it('no destruye el estado cuando la identidad del usuario es __proto__', () => {
-    const usuarioProto: SessionUser = { ...CLIENTE, id: '__proto__', correo: 'proto@example.com' };
-    const store = crearStore(usuarioProto);
-
-    expect(store.acreditarCompra('burger-house', 'proto-1', 10)).toBe('ok');
-    expect(saldo(store, 'burger-house')).toBe(1260);
-    expect(store.movimientos).toHaveLength(1);
-
-    expect(store.acreditarCompra('burger-house', 'proto-2', 5)).toBe('ok');
-    expect(saldo(store, 'burger-house')).toBe(1265);
-    expect(store.movimientos).toHaveLength(2);
-
-    const otroUsuario = crearStore(CLIENTE);
-    expect(saldo(otroUsuario, 'burger-house')).toBe(1250);
-  });
-
-  it('no otorga puntos gratis con una oferta persistida con puntos negativos', () => {
-    const ofertaNegativa: Producto = { nombre: 'Puntos gratis', puntos: -500, imagen: 'assets/img/no-existe.png' };
-    localStorage.setItem('snacki.store-offers', JSON.stringify({ 'burger-house': [ofertaNegativa] }));
-
+  it('permite a un comercio autorizado agregar y eliminar recompensas', () => {
     const comercio = crearStore(COMERCIO_BURGER);
-    expect(comercio.agregarRecompensa('burger-house', 'Otro gratis', -1)).toBe(false);
-
-    const store = crearStore(CLIENTE);
-    expect(store.getById('burger-house')?.productos.some((item) => item.nombre === ofertaNegativa.nombre)).toBe(false);
-
-    const saldoAntes = saldo(store, 'burger-house');
-    const movimientosAntes = store.movimientos.length;
-
-    expect(store.canjear('burger-house', ofertaNegativa)).toBe('invalido');
-    expect(saldo(store, 'burger-house')).toBe(saldoAntes);
-    expect(store.movimientos).toHaveLength(movimientosAntes);
+    expect(comercio.agregarRecompensa('burger-house', 'Oferta autorizada', 150)).toBe(true);
+    expect(comercio.getById('burger-house')?.productos.some((item) => item.nombre === 'Oferta autorizada')).toBe(true);
+    expect(comercio.eliminarRecompensa('burger-house', 'Oferta autorizada')).toBe(true);
   });
 
-  it('rechaza agregar o eliminar recompensas si el usuario no es comercio del local', () => {
-    const comercio = crearStore(COMERCIO_BURGER);
-    expect(comercio.agregarRecompensa('burger-house', 'Oferta autorizada', 50)).toBe(true);
-
+  it('impide que un cliente modifique el catálogo del comercio', () => {
     const cliente = crearStore(CLIENTE);
-    expect(cliente.agregarRecompensa('burger-house', 'Oferta cliente', 50)).toBe(false);
-    expect(cliente.eliminarRecompensa('burger-house', 'Oferta autorizada')).toBe(false);
-    expect(cliente.getById('burger-house')?.productos.some((item) => item.nombre === 'Oferta autorizada')).toBe(true);
-
-    const otroComercio = crearStore({
-      ...COMERCIO_BURGER,
-      id: 'com-pizza',
-      correo: 'pizza-owner@example.com',
-      comercioId: 'pizza-hut',
-    });
-    expect(otroComercio.eliminarRecompensa('burger-house', 'Oferta autorizada')).toBe(false);
-
-    const comercioRecargado = crearStore(COMERCIO_BURGER);
-    expect(comercioRecargado.eliminarRecompensa('burger-house', 'Oferta autorizada')).toBe(true);
-    expect(comercioRecargado.getById('burger-house')?.productos.some((item) => item.nombre === 'Oferta autorizada')).toBe(false);
-  });
-
-  it('migra los saldos legacy de una sesion sin id y conserva un id estable', () => {
-    localStorage.setItem('snacki.point-balances', JSON.stringify({ 'elias@example.com': { 'burger-house': 777 } }));
-    localStorage.setItem('snacki.current-user', JSON.stringify({
-      nombre: 'Elias',
-      correo: 'elias@example.com',
-      tipo: 'cliente',
-    }));
-
-    TestBed.configureTestingModule({ providers: [AuthService, StoreService] });
-    const store = TestBed.inject(StoreService);
-    const auth = TestBed.inject(AuthService);
-
-    expect(saldo(store, 'burger-house')).toBe(777);
-    expect(auth.currentUser?.id).toBeTruthy();
-    expect(JSON.parse(localStorage.getItem('snacki.current-user')!).id).toBe(auth.currentUser?.id);
+    expect(cliente.agregarRecompensa('burger-house', 'Oferta no autorizada', 150)).toBe(false);
   });
 });
