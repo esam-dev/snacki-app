@@ -1,12 +1,23 @@
-import { inject } from '@angular/core';
+﻿import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService, TipoCuenta } from './auth.service';
 
-/** Separación de UX de la demo, no una medida de seguridad. */
-export const roleGuard = (tipo: TipoCuenta): CanActivateFn => (_route, state) => {
+export const roleGuard = (tipo: TipoCuenta): CanActivateFn => async (_route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
-  return auth.currentUser?.tipo === tipo
-    ? true
-    : router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
+
+  await auth.ensureSessionResolved();
+
+  const user = auth.currentUser;
+  if (!user) {
+    return router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
+  }
+
+  if (user.tipo === tipo) {
+    return true;
+  }
+
+  // Redirect to the correct home for the authenticated role to avoid loops/confusion
+  const home = user.tipo === 'comercio' ? '/comercio' : '/tabs/home';
+  return router.createUrlTree([home]);
 };
