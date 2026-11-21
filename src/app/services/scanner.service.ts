@@ -1,12 +1,12 @@
-import { Injectable } from '@angular/core';
+﻿import { Injectable } from '@angular/core';
 import { Capacitor } from '@capacitor/core';
 import { BarcodeFormat, BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 
-/**
- * Formato de los QR de los locales: snacki://local/<id>
- * Ejemplo: snacki://local/burger-house
- */
-const QR_PREFIX = 'snacki://local/';
+export interface PurchaseQr {
+  localId: string;
+  purchaseId: string;
+  puntos: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class ScannerService {
@@ -34,8 +34,31 @@ export class ScannerService {
     return barcodes[0]?.rawValue ?? null;
   }
 
-  /** Extrae el id del local desde el contenido del QR. */
+  /** QR informativo: snacki://local/<id>. */
   extraerLocalId(valor: string): string | null {
-    return valor.startsWith(QR_PREFIX) ? valor.substring(QR_PREFIX.length) : null;
+    const match = /^snacki:\/\/local\/([a-z0-9-]+)$/.exec(valor.trim());
+    return match?.[1] ?? null;
+  }
+
+  /** QR de compra de demostración: snacki://purchase/<localId>?id=<id>&points=<puntos>. */
+  extraerCompra(valor: string): PurchaseQr | null {
+    try {
+      const url = new URL(valor.trim());
+      if (url.protocol !== 'snacki:' || url.hostname !== 'purchase') return null;
+      const localId = url.pathname.replace(/^\//, '');
+      if (!/^[a-z0-9-]+$/.test(localId)) return null;
+
+      const purchaseId = (url.searchParams.get('id') || '').trim();
+      if (!purchaseId || purchaseId.length > 120) return null;
+
+      const rawPoints = url.searchParams.get('points');
+      if (rawPoints === null || !/^\d+$/.test(rawPoints)) return null;
+      const puntos = Number(rawPoints);
+      if (!Number.isSafeInteger(puntos) || puntos < 1 || puntos > 100000) return null;
+
+      return { localId, purchaseId, puntos };
+    } catch {
+      return null;
+    }
   }
 }

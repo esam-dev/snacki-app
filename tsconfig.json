@@ -1,5 +1,4 @@
-/* To learn more about this file see: https://angular.io/config/tsconfig. */
-{
+﻿{
   "compileOnSave": false,
   "compilerOptions": {
     "outDir": "./dist/out-tsc",
@@ -26,5 +25,6 @@
     "strictInjectionParameters": true,
     "strictInputAccessModifiers": true,
     "strictTemplates": true
-  }
+  },
+  "exclude": ["backend", "node_modules", "dist", "www", ".angular"]
 }

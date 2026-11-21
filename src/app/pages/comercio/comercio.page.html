@@ -1,0 +1,36 @@
+<ion-content class="snacki-page" [fullscreen]="true">
+  <app-snacki-header></app-snacki-header>
+  @if (comercio) {
+    <header class="merchant-heading">
+      <p class="eyebrow">PANEL DEL COMERCIO</p>
+      <h1>{{ comercio.nombre }}</h1>
+      <p>Administra las recompensas que tus clientes pueden canjear con los puntos de tu tienda.</p>
+    </header>
+
+    <section class="merchant-card">
+      <h2>Agregar recompensa</h2>
+      <label class="snacki-label">Nombre del producto o beneficio</label>
+      <ion-input class="snacki-input" name="nombreRecompensa" maxlength="60" placeholder="Ej. Café gratis" [(ngModel)]="nombreRecompensa"></ion-input>
+      <label class="snacki-label">Costo en puntos</label>
+      <ion-input class="snacki-input" name="costoPuntos" type="number" min="1" max="100000" step="1" inputmode="numeric" placeholder="Ej. 250" [(ngModel)]="costoPuntos"></ion-input>
+      <ion-button class="snacki-btn" expand="block" [disabled]="agregando" (click)="agregarRecompensa()">Agregar al catálogo</ion-button>
+    </section>
+
+    <section class="rewards-list">
+      <h2>Recompensas de {{ comercio.nombre }}</h2>
+      @for (producto of comercio.productos; track producto.nombre) {
+        <article class="reward-row">
+          <img [src]="producto.imagen" [alt]="producto.nombre" />
+          <div class="reward-info"><strong>{{ producto.nombre }}</strong><span>{{ producto.puntos | number }} PTS</span></div>
+          <button type="button" class="remove" aria-label="Eliminar recompensa" (click)="eliminarRecompensa(producto)">Quitar</button>
+        </article>
+      } @empty {
+        <p class="empty">Todavía no agregaste recompensas.</p>
+      }
+    </section>
+    <p class="demo-note">Modo demostración: el catálogo se guarda en este dispositivo. Para que tus clientes reciban cambios y el comercio consulte saldos se necesita el backend compartido.</p>
+    <div class="logout"><ion-button fill="outline" (click)="cerrarSesion()">Cerrar sesión</ion-button></div>
+  } @else {
+    <p class="empty">No encontramos un comercio asociado a esta cuenta.</p>
+  }
+</ion-content>

@@ -5,6 +5,7 @@
   .caption { display: flex; align-items: center; gap: 6px; ion-icon { font-size: 16px; } }
   .value { font-size: 17px; margin-top: 10px; }
 }
+.demo-note { margin: 0 10px 14px; color: #747b88; font-size: 12px; line-height: 1.45; }
 
 .rows { display: flex; flex-direction: column; gap: 8px; }
 
@@ -25,3 +26,5 @@
 
 .canjes-title { font-size: 14px; font-weight: 400; margin: 18px 6px 8px; }
 .canje { display: flex; justify-content: space-between; font-size: 12px; padding: 6px; border-bottom: 1px solid #eee; }
+.canje .earned { color: #16834a; }
+.empty-history { margin: 8px 6px; color: #747b88; font-size: 13px; }

@@ -26,11 +26,29 @@ export class QrPage {
       const valor = await this.scanner.scan();
       if (!valor) return;
 
+      const compra = this.scanner.extraerCompra(valor);
+      if (compra) {
+        const local = this.stores.getById(compra.localId);
+        if (!local) {
+          await this.mostrar('El QR pertenece a un comercio que no está disponible.');
+          return;
+        }
+        const resultado = this.stores.acreditarCompra(compra.localId, compra.purchaseId, compra.puntos);
+        if (resultado === 'ok') {
+          await this.mostrar(`¡Compra registrada! Sumaste ${compra.puntos.toLocaleString('es')} puntos en ${local.nombre}. Saldo: ${this.stores.getById(compra.localId)?.puntos.toLocaleString('es')} PTS.`);
+        } else if (resultado === 'duplicado') {
+          await this.mostrar('Este QR de compra ya fue utilizado.');
+        } else {
+          await this.mostrar('El QR de compra no es válido.');
+        }
+        return;
+      }
+
       const id = this.scanner.extraerLocalId(valor);
       if (id && this.stores.getById(id)) {
         this.router.navigate(['/tabs/explorar', id]);
       } else {
-        await this.mostrar('El código QR no pertenece a un local de Snacki.');
+        await this.mostrar('QR no reconocido. Pide al comercio su QR de compra Snacki.');
       }
     } catch (e: any) {
       await this.mostrar(e?.message ?? 'No se pudo escanear el código QR.');

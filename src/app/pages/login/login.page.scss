@@ -56,6 +56,13 @@
   }
 }
 
+.account-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: -12px 0 22px; }
+.account-switch button { min-height: 64px; display: grid; grid-template-columns: 20px 1fr; align-content: center; align-items: center; text-align: left; gap: 1px 7px; padding: 8px 10px; border: 1px solid #e3e5eb; border-radius: 12px; background: #fff; color: #343946; }
+.account-switch button.active { border-color: var(--ion-color-primary); background: #f3f7ff; box-shadow: 0 0 0 1px var(--ion-color-primary); }
+.account-switch ion-icon { grid-row: span 2; color: var(--ion-color-primary); font-size: 18px; }
+.account-switch span { font-size: 13px; font-weight: 700; }
+.account-switch small { color: #727887; font-size: 9px; }
+
 /* Campo con botón de mostrar/ocultar: patrón global .with-icon/.eye */
 
 .center {

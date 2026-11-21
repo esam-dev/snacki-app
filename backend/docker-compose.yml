@@ -1,0 +1,42 @@
+﻿services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: snacki-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: snacki
+      POSTGRES_PASSWORD: snacki
+      POSTGRES_DB: snacki
+    ports:
+      - "5432:5432"
+    volumes:
+      - snacki_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U snacki -d snacki"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: snacki-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      DATABASE_URL: postgresql://snacki:snacki@postgres:5432/snacki?schema=public
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-use-a-long-random-secret}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-3600}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8100,http://localhost:4200,capacitor://localhost,ionic://localhost}
+      PLATFORM_TENANT_NAME: ${PLATFORM_TENANT_NAME:-Snacki}
+      PLATFORM_TENANT_SLUG: ${PLATFORM_TENANT_SLUG:-snacki}
+    ports:
+      - "3000:3000"
+
+volumes:
+  snacki_pg_data:

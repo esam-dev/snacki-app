@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+﻿import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { IonButton, IonCheckbox, IonContent, IonIcon, IonInput } from '@ionic/angular';
 import { addIcons } from 'ionicons';
@@ -17,7 +17,6 @@ export class PerfilPage {
   private auth = inject(AuthService);
   private router = inject(Router);
 
-  // Datos de ejemplo del diseño
   nombre = this.auth.currentUser?.nombre ?? 'Usuario';
   correo = this.auth.currentUser?.correo ?? '';
   cedula = '1234599';
@@ -36,8 +35,8 @@ export class PerfilPage {
 
   agregarFoto() {}
 
-  cerrarSesion() {
-    this.auth.cerrarSesion();
+  async cerrarSesion() {
+    await this.auth.cerrarSesion();
     this.router.navigateByUrl('/login');
   }
 }

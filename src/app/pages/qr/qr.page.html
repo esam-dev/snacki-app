@@ -1,16 +1,20 @@
 <ion-content class="snacki-page" [fullscreen]="true">
   <app-snacki-header [back]="true"></app-snacki-header>
 
-  <p class="hint">Escanea el código QR del comercio<br />para ver recompensas que puedes canjear con tus puntos.</p>
-
-  <div class="qr-box">
-    <img class="qr" src="assets/img/qr-placeholder.png" alt="Código QR" />
-    <img class="frame" src="assets/img/qr-frame.png" alt="" aria-hidden="true" />
-  </div>
+  <section class="flow-card">
+    <h1>Acumula y canjea</h1>
+    <ol>
+      <li><strong>Compra en un comercio afiliado.</strong></li>
+      <li><strong>Pide su QR de compra</strong> y escanéalo para sumar puntos en ese comercio.</li>
+      <li><strong>Canjea recompensas</strong> usando el saldo de ese mismo comercio.</li>
+    </ol>
+    <p>Los puntos y movimientos se muestran por separado para cada comercio.</p>
+  </section>
 
   <div class="center">
     <ion-button class="snacki-btn" shape="round" [disabled]="escaneando" (click)="escanear()">
-      Escanear QR del comercio
+      {{ escaneando ? 'Abriendo cámara…' : 'Escanear QR de compra' }}
     </ion-button>
   </div>
+  <p class="demo-note">Modo demostración: el comercio aún no recibe estos movimientos. La validación compartida se conectará al backend.</p>
 </ion-content>
