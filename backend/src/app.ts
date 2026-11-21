@@ -1,4 +1,4 @@
-﻿import Fastify from 'fastify';
+import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { env } from './config/env.js';
 import { errorHandler } from './common/errors/error-handler.js';
@@ -10,22 +10,15 @@ export async function buildApp() {
 
   await app.register(cors, {
     origin: (origin, cb) => {
-      // allow non-browser clients / same-origin tools
-      if (!origin) return cb(null, true);
-      if (env.corsOrigins.includes(origin)) return cb(null, true);
-      // allow capacitor/ionic schemes and localhost dev variants
-      if (/^(capacitor|ionic):\/\//.test(origin) || /^http:\/\/localhost(:\d+)?$/.test(origin)) return cb(null, true);
+      if (!origin || env.corsOrigins.includes(origin) || /^(capacitor|ionic):\/\//.test(origin) || /^http:\/\/localhost(:\d+)?$/.test(origin)) return cb(null, true);
       return cb(null, false);
     },
-    credentials: false,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   app.setErrorHandler(errorHandler);
-
   app.get('/health', async () => ({ status: 'ok' }));
-
   app.register(async (api) => {
     api.register(authRoutes, { prefix: '/auth' });
     api.register(tenantsRoutes, { prefix: '/tenants' });

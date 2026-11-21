@@ -1,51 +1,18 @@
-﻿export type UserRole = 'cliente' | 'comercio';
-
-export interface AuthUser {
-  id: string;
-  fullName: string;
-  email: string;
-  isActive: boolean;
-}
-
-export interface AuthMembership {
-  role: UserRole;
-  tenantId: string;
-  tenantSlug?: string;
-  tenantName?: string;
-}
-
-export interface AuthToken {
-  accessToken: string;
-  tokenType: 'Bearer';
-  expiresIn: number;
-}
+export type UserRole = 'cliente' | 'comercio';
 
 export interface AuthSessionData {
-  user: AuthUser;
-  membership: AuthMembership;
-  auth: AuthToken;
+  user: { id: string; fullName: string; email: string; isActive: boolean };
+  membership: { role: UserRole; tenantId: string; tenantSlug?: string; tenantName?: string };
+  auth: { accessToken: string; tokenType: 'Bearer'; expiresIn: number };
 }
 
 export interface MeSessionData {
-  user: AuthUser;
-  membership: AuthMembership;
-  session?: {
-    issuedAt?: string;
-    expiresAt?: string;
-  };
+  user: AuthSessionData['user'];
+  membership: AuthSessionData['membership'];
+  session?: { issuedAt?: string; expiresAt?: string };
 }
 
-export interface ApiResponse<T> {
-  data: T;
-}
-
-export interface ApiErrorResponse {
-  error: {
-    code: string;
-    message: string;
-    details?: Array<{ field?: string; message?: string }> | unknown;
-  };
-}
+export interface ApiResponse<T> { data: T; }
 
 export interface LoginPayload {
   identifier: string;
