@@ -1,4 +1,4 @@
-﻿-- CreateEnum
+-- CreateEnum
 CREATE TYPE "UserTenantRole" AS ENUM ('cliente', 'comercio');
 
 -- CreateTable
