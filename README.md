@@ -150,6 +150,7 @@ npx cap open android       # abre Android Studio → Run ▶
 
 - **`Can't reach database server`**: Postgres no está corriendo. Abre Docker Desktop y corre `docker compose up -d postgres`.
 - **Puerto 5432 ocupado**: ya tienes otro Postgres instalado. Detenlo o cambia el puerto en `docker-compose.yml` y en `DATABASE_URL`.
+- **`The migration ... was modified after it was applied`**: tu base local tiene una versión vieja de la migración inicial. Desde `backend/`, corre `npx prisma migrate reset` (borra la base local y vuelve a crearla con el seed).
 - **Error de CORS en la app**: agrega el origen de la app a `CORS_ORIGIN` y reinicia el backend.
 - **Login falla en el celular**: `apiBaseUrl` apunta a `localhost`. Mira la sección de Android.
 

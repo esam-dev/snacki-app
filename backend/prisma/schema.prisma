@@ -12,28 +12,70 @@ enum UserTenantRole {
   comercio
 }
 
+enum TenantCategory {
+  helado
+  comida_rapida
+  pizza
+  cafe
+  otro
+}
+
+enum PointEntryType {
+  EARN
+  REDEEM
+}
+
+enum RedemptionStatus {
+  PENDING
+  DELIVERED
+}
+
+enum DevicePlatform {
+  android
+  ios
+  web
+}
+
 model User {
-  id           String              @id @default(uuid()) @db.Uuid
-  email        String              @unique
-  passwordHash String              @map("password_hash")
-  fullName     String              @map("full_name")
-  isActive     Boolean             @default(true) @map("is_active")
-  createdAt    DateTime            @default(now()) @map("created_at")
-  updatedAt    DateTime            @updatedAt @map("updated_at")
-  memberships  UserTenantRoleMap[]
+  id            String              @id @default(uuid()) @db.Uuid
+  email         String              @unique
+  passwordHash  String              @map("password_hash")
+  fullName      String              @map("full_name")
+  isActive      Boolean             @default(true) @map("is_active")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+  memberships   UserTenantRoleMap[]
+  claimsCreated PurchaseClaim[]     @relation("ClaimCreatedBy")
+  claimsClaimed PurchaseClaim[]     @relation("ClaimClaimedBy")
+  pointEntries  PointEntry[]
+  redemptions   Redemption[]
+  devices       DeviceToken[]
 
   @@map("users")
 }
 
 model Tenant {
-  id          String              @id @default(uuid()) @db.Uuid
-  name        String
-  slug        String              @unique
-  isActive    Boolean             @default(true) @map("is_active")
-  createdAt   DateTime            @default(now()) @map("created_at")
-  updatedAt   DateTime            @updatedAt @map("updated_at")
-  memberships UserTenantRoleMap[]
+  id             String              @id @default(uuid()) @db.Uuid
+  name           String
+  slug           String              @unique
+  category       TenantCategory      @default(otro)
+  address        String?
+  latitude       Float?
+  longitude      Float?
+  logoUrl        String?             @map("logo_url")
+  pointsExpireAt DateTime?           @map("points_expire_at")
+  isActive       Boolean             @default(true) @map("is_active")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  memberships    UserTenantRoleMap[]
+  products       Product[]
+  rewards        Reward[]
+  claims         PurchaseClaim[]
+  pointEntries   PointEntry[]
+  redemptions    Redemption[]
+  notifications  Notification[]
 
+  @@index([latitude, longitude])
   @@map("tenants")
 }
 
@@ -51,4 +93,142 @@ model UserTenantRoleMap {
   @@unique([userId, tenantId])
   @@index([tenantId, role])
   @@map("user_tenant_roles")
+}
+
+/// Producto promocional: solo da puntos mientras la promo está vigente.
+model Product {
+  id            String          @id @default(uuid()) @db.Uuid
+  tenantId      String          @map("tenant_id") @db.Uuid
+  name          String
+  description   String?
+  points        Int
+  imageUrl      String?         @map("image_url")
+  promoStartsAt DateTime        @map("promo_starts_at")
+  promoEndsAt   DateTime        @map("promo_ends_at")
+  isActive      Boolean         @default(true) @map("is_active")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  claims        PurchaseClaim[]
+  notifications Notification[]
+
+  @@index([tenantId, isActive, promoEndsAt])
+  @@map("products")
+}
+
+model Reward {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  name        String
+  description String?
+  cost        Int
+  imageUrl    String?  @map("image_url")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pointEntries PointEntry[]
+  redemptions  Redemption[]
+
+  @@index([tenantId, isActive])
+  @@map("rewards")
+}
+
+/// QR de una venta: un solo uso, vence en 24 h (permite sincronizar offline).
+model PurchaseClaim {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  productId   String    @map("product_id") @db.Uuid
+  quantity    Int       @default(1)
+  points      Int
+  expiresAt   DateTime  @map("expires_at")
+  createdById String    @map("created_by_id") @db.Uuid
+  claimedById String?   @map("claimed_by_id") @db.Uuid
+  claimedAt   DateTime? @map("claimed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  createdBy  User        @relation("ClaimCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  claimedBy  User?       @relation("ClaimClaimedBy", fields: [claimedById], references: [id], onDelete: SetNull)
+  pointEntry PointEntry?
+
+  @@index([tenantId, createdAt])
+  @@map("purchase_claims")
+}
+
+/// Libro de puntos. Saldo = suma de `remaining` de EARN no vencidos.
+/// Los canjes consumen EARN en orden FIFO por `expiresAt`.
+model PointEntry {
+  id        String         @id @default(uuid()) @db.Uuid
+  userId    String         @map("user_id") @db.Uuid
+  tenantId  String         @map("tenant_id") @db.Uuid
+  type      PointEntryType
+  points    Int
+  remaining Int            @default(0)
+  expiresAt DateTime?      @map("expires_at")
+  claimId   String?        @unique @map("claim_id") @db.Uuid
+  rewardId  String?        @map("reward_id") @db.Uuid
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  claim  PurchaseClaim? @relation(fields: [claimId], references: [id], onDelete: SetNull)
+  reward Reward?        @relation(fields: [rewardId], references: [id], onDelete: SetNull)
+
+  @@index([userId, tenantId, type, expiresAt])
+  @@index([tenantId, createdAt])
+  @@map("point_entries")
+}
+
+model Redemption {
+  id          String           @id @default(uuid()) @db.Uuid
+  userId      String           @map("user_id") @db.Uuid
+  tenantId    String           @map("tenant_id") @db.Uuid
+  rewardId    String           @map("reward_id") @db.Uuid
+  code        String           @unique
+  cost        Int
+  status      RedemptionStatus @default(PENDING)
+  deliveredAt DateTime?        @map("delivered_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  reward Reward @relation(fields: [rewardId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, status, createdAt])
+  @@map("redemptions")
+}
+
+model DeviceToken {
+  id        String         @id @default(uuid()) @db.Uuid
+  userId    String         @map("user_id") @db.Uuid
+  token     String         @unique
+  platform  DevicePlatform
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+/// Audiencia = clientes con PointEntry en el tenant.
+model Notification {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  productId  String?  @map("product_id") @db.Uuid
+  title      String
+  body       String
+  recipients Int      @default(0)
+  sentAt     DateTime @default(now()) @map("sent_at")
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, sentAt])
+  @@map("notifications")
 }
