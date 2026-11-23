@@ -145,3 +145,20 @@ select.field-input{appearance:none;background-image:linear-gradient(45deg,transp
 }
 .field-row .field-label:first-child{margin-top:16px}
 @media (min-width:768px) and (max-width:1023px){.stat-card{flex-direction:column;gap:8px}}
+
+/* Botón de mapa y modal de ubicación */
+.icon-btn{position:relative;cursor:pointer}
+.icon-btn:hover{background:#f4f6fb}
+.icon-btn.has-dot::after{content:'';position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:#e07b2f;border:2px solid #fff}
+.map-frame{height:300px;border-radius:14px;overflow:hidden;border:1px solid #ececf0;background:#eef1f6}
+.map-frame iframe{display:block;width:100%;height:100%;border:0}
+.map-info{display:flex;align-items:flex-start;gap:10px;margin:16px 0 8px}
+.map-info ion-icon{font-size:22px;color:#357bff;flex-shrink:0;margin-top:1px}
+.map-info div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.map-info strong{font-size:15px;color:#171923}
+.map-info span{font-size:12px;color:#8a8d96}
+.map-link{text-decoration:none}
+@media (max-width:480px){.map-frame{height:240px}}
+.map-preview{height:200px;margin:0 0 8px}
+.map-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;height:100%;padding:16px;text-align:center;color:#8a8d96;font-size:12px}
+.map-empty ion-icon{font-size:30px}

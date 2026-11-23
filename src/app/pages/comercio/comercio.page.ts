@@ -1,6 +1,7 @@
 import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe, DecimalPipe } from '@angular/common';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { Router } from '@angular/router';
 import { AlertController, IonButtons, IonContent, IonFooter, IonHeader, IonIcon, IonModal, IonSpinner, IonTitle, IonToolbar, ToastController } from '@ionic/angular';
 import { addIcons } from 'ionicons';
@@ -17,6 +18,8 @@ import {
   imageOutline,
   locationOutline,
   logOutOutline,
+  mapOutline,
+  openOutline,
   navigateOutline,
   pricetagsOutline,
   refreshOutline,
@@ -31,7 +34,7 @@ import {
 import { AuthService } from '../../services/auth.service';
 import { MerchantProduct, MerchantReward, MerchantService, MerchantSettings } from '../../services/merchant.service';
 
-type ModalKind = 'promo' | 'reward' | 'settings' | null;
+type ModalKind = 'promo' | 'reward' | 'settings' | 'map' | null;
 type Section = 'inicio' | 'promos' | 'recompensas';
 type PromoStatus = 'activa' | 'programada' | 'finalizada' | 'pausada';
 
@@ -62,6 +65,13 @@ export class ComercioPage {
   private toast = inject(ToastController);
   private alert = inject(AlertController);
   private cdr = inject(ChangeDetectorRef);
+  private sanitizer = inject(DomSanitizer);
+
+  /** URL del mapa embebido; se calcula al abrir el modal para no recrear el iframe en cada ciclo. */
+  mapEmbedUrl: SafeResourceUrl | null = null;
+  /** Vista previa del mapa dentro del modal de configuración. */
+  settingsMapUrl: SafeResourceUrl | null = null;
+  private abrirSettingsTrasMapa = false;
 
   readonly categorias = CATEGORIAS;
 
@@ -113,6 +123,8 @@ export class ComercioPage {
       imageOutline,
       locationOutline,
       logOutOutline,
+      mapOutline,
+      openOutline,
       navigateOutline,
       pricetagsOutline,
       refreshOutline,
@@ -256,7 +268,56 @@ export class ComercioPage {
     this.settingsLng = s?.longitude ?? null;
     this.settingsLogoUrl = s?.logoUrl || '';
     this.settingsPointsExpireAt = s?.pointsExpireAt ? s.pointsExpireAt.slice(0, 10) : '';
+    this.actualizarMapaSettings();
     this.modal = 'settings';
+  }
+
+  abrirMapa() {
+    if (!this.tieneUbicacion) {
+      this.abrirSettings();
+      this.mostrar('Agrega la ubicación de tu tienda para verla en el mapa.');
+      return;
+    }
+    const lat = Number(this.settings!.latitude);
+    const lng = Number(this.settings!.longitude);
+    this.mapEmbedUrl = this.buildMapUrl(lat, lng);
+    this.modal = 'map';
+  }
+
+  /** Recalcula la vista previa del mapa del modal de configuración con las coordenadas del formulario. */
+  actualizarMapaSettings() {
+    const lat = this.settingsLat === '' || this.settingsLat === null ? NaN : Number(this.settingsLat);
+    const lng = this.settingsLng === '' || this.settingsLng === null ? NaN : Number(this.settingsLng);
+    const valido = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+    this.settingsMapUrl = valido ? this.buildMapUrl(lat, lng) : null;
+  }
+
+  private buildMapUrl(lat: number, lng: number): SafeResourceUrl {
+    const d = 0.004;
+    const url =
+      `https://www.openstreetmap.org/export/embed.html?bbox=${lng - d},${lat - d},${lng + d},${lat + d}` +
+      `&layer=mapnik&marker=${lat},${lng}`;
+    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  }
+
+  get googleMapsUrl(): string {
+    return `https://www.google.com/maps/search/?api=1&query=${this.settings?.latitude},${this.settings?.longitude}`;
+  }
+
+  editarUbicacion() {
+    // Se abre la configuración cuando el modal del mapa termina de cerrarse (ver onModalDismiss).
+    this.abrirSettingsTrasMapa = true;
+    this.modal = null;
+  }
+
+  /** Cada modal solo se cierra a sí mismo: evita que un didDismiss tardío cierre el modal siguiente. */
+  onModalDismiss(kind: Exclude<ModalKind, null>) {
+    if (this.modal === kind) this.modal = null;
+    if (kind === 'map' && this.abrirSettingsTrasMapa) {
+      this.abrirSettingsTrasMapa = false;
+      this.abrirSettings();
+    }
+    this.cdr.markForCheck();
   }
 
   cerrarModal() {
@@ -393,6 +454,7 @@ export class ComercioPage {
       (pos) => {
         this.settingsLat = Number(pos.coords.latitude.toFixed(6));
         this.settingsLng = Number(pos.coords.longitude.toFixed(6));
+        this.actualizarMapaSettings();
         this.cdr.markForCheck();
       },
       () => this.mostrar('No se pudo obtener tu ubicación.'),

@@ -16,6 +16,9 @@
       </div>
     </div>
     <div class="dash-actions">
+      <button class="icon-btn" type="button" [class.has-dot]="!tieneUbicacion" [attr.aria-label]="tieneUbicacion ? 'Ver ubicación en el mapa' : 'Agregar ubicación'" [title]="tieneUbicacion ? 'Ver ubicación en el mapa' : 'Agregar ubicación'" (click)="abrirMapa()">
+        <ion-icon name="map-outline"></ion-icon>
+      </button>
       <button class="icon-btn" type="button" aria-label="Configuración" (click)="abrirSettings()">
         <ion-icon name="settings-outline"></ion-icon>
       </button>
@@ -191,7 +194,7 @@
  </div>
 
   <!-- Modal: Promo -->
-  <ion-modal class="dash-modal" [isOpen]="modal === 'promo'" (didDismiss)="cerrarModal()">
+  <ion-modal class="dash-modal" [isOpen]="modal === 'promo'" (didDismiss)="onModalDismiss('promo')">
     <ng-template>
       <ion-header>
         <ion-toolbar>
@@ -232,7 +235,7 @@
   </ion-modal>
 
   <!-- Modal: Reward -->
-  <ion-modal class="dash-modal" [isOpen]="modal === 'reward'" (didDismiss)="cerrarModal()">
+  <ion-modal class="dash-modal" [isOpen]="modal === 'reward'" (didDismiss)="onModalDismiss('reward')">
     <ng-template>
       <ion-header>
         <ion-toolbar>
@@ -260,7 +263,7 @@
   </ion-modal>
 
   <!-- Modal: Settings -->
-  <ion-modal class="dash-modal" [isOpen]="modal === 'settings'" (didDismiss)="cerrarModal()">
+  <ion-modal class="dash-modal" [isOpen]="modal === 'settings'" (didDismiss)="onModalDismiss('settings')">
     <ng-template>
       <ion-header>
         <ion-toolbar>
@@ -308,16 +311,26 @@
         <div class="field-row">
           <div>
             <label class="field-label">Latitud</label>
-            <input class="field-input" type="number" [(ngModel)]="settingsLat" step="any" />
+            <input class="field-input" type="number" [(ngModel)]="settingsLat" (ngModelChange)="actualizarMapaSettings()" step="any" />
           </div>
           <div>
             <label class="field-label">Longitud</label>
-            <input class="field-input" type="number" [(ngModel)]="settingsLng" step="any" />
+            <input class="field-input" type="number" [(ngModel)]="settingsLng" (ngModelChange)="actualizarMapaSettings()" step="any" />
           </div>
         </div>
         <button class="btn-secondary" type="button" (click)="usarMiUbicacion()">
           <ion-icon name="navigate-outline"></ion-icon> Usar mi ubicación
         </button>
+        <div class="map-frame map-preview">
+          @if (settingsMapUrl) {
+            <iframe [src]="settingsMapUrl" title="Vista previa de la ubicación" loading="lazy"></iframe>
+          } @else {
+            <div class="map-empty">
+              <ion-icon name="map-outline"></ion-icon>
+              <span>Ingresa latitud y longitud o usa tu ubicación para ver el mapa.</span>
+            </div>
+          }
+        </div>
         <label class="field-label">Puntos expiran el</label>
         <input class="field-input" type="date" [(ngModel)]="settingsPointsExpireAt" />
       </ion-content>
@@ -326,6 +339,41 @@
         <button class="btn-primary" type="button" [disabled]="saving || procesandoLogo" (click)="guardarSettings()">
           {{ saving ? 'Guardando...' : 'Guardar configuración' }}
         </button>
+      </ion-footer>
+    </ng-template>
+  </ion-modal>
+
+  <!-- Modal: Mapa -->
+  <ion-modal class="dash-modal" [isOpen]="modal === 'map'" (didDismiss)="onModalDismiss('map')">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>Ubicación de la tienda</ion-title>
+          <ion-buttons slot="end">
+            <button class="modal-close" type="button" aria-label="Cerrar" (click)="cerrarModal()"><ion-icon name="close-outline"></ion-icon></button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="modal-body">
+        <div class="map-frame">
+          @if (mapEmbedUrl) {
+            <iframe [src]="mapEmbedUrl" title="Mapa de la ubicación de la tienda" loading="lazy"></iframe>
+          }
+        </div>
+        <div class="map-info">
+          <ion-icon name="location-outline"></ion-icon>
+          <div>
+            <strong>{{ settings?.address || 'Sin dirección' }}</strong>
+            <span>{{ settings?.latitude }}, {{ settings?.longitude }}</span>
+          </div>
+        </div>
+        <a class="btn-secondary map-link" [href]="googleMapsUrl" target="_blank" rel="noopener">
+          <ion-icon name="open-outline"></ion-icon> Abrir en Google Maps
+        </a>
+      </ion-content>
+      <ion-footer class="modal-footer">
+        <button class="btn-ghost" type="button" (click)="cerrarModal()">Cerrar</button>
+        <button class="btn-primary" type="button" (click)="editarUbicacion()">Editar ubicación</button>
       </ion-footer>
     </ng-template>
   </ion-modal>
