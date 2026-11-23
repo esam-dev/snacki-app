@@ -22,6 +22,7 @@ async function platformTenant() {
     where: { slug: env.PLATFORM_TENANT_SLUG },
     update: { name: env.PLATFORM_TENANT_NAME, isActive: true },
     create: { name: env.PLATFORM_TENANT_NAME, slug: env.PLATFORM_TENANT_SLUG, isActive: true },
+    select: { id: true },
   });
 }
 
@@ -34,7 +35,7 @@ export const authService = {
 
     let tenant;
     if (input.accountType === 'comercio') {
-      tenant = await prisma.tenant.findUnique({ where: { id: input.tenantId! } });
+      tenant = await prisma.tenant.findUnique({ where: { id: input.tenantId! }, select: { id: true, isActive: true } });
       if (!tenant?.isActive) throw new AppError(404, 'TENANT_NOT_FOUND', 'Comercio no encontrado');
     } else {
       tenant = await platformTenant();
@@ -47,7 +48,7 @@ export const authService = {
       });
       const membership = await tx.userTenantRoleMap.create({
         data: { userId: user.id, tenantId: tenant!.id, role: input.accountType },
-        include: { tenant: true },
+        select: { role: true, tenantId: true, tenant: { select: { id: true, slug: true, name: true } } },
       });
       return { user, membership };
     });
@@ -63,7 +64,12 @@ export const authService = {
   async login(input: LoginInput) {
     const user = await prisma.user.findUnique({
       where: { email: input.identifier.trim().toLowerCase() },
-      include: { memberships: { include: { tenant: true } } },
+      select: {
+        id: true, fullName: true, email: true, isActive: true, passwordHash: true,
+        memberships: {
+          select: { role: true, tenantId: true, tenant: { select: { id: true, slug: true, name: true, isActive: true } } },
+        },
+      },
     });
     const invalid = () => new AppError(401, 'INVALID_CREDENTIALS', 'Credenciales inválidas');
     if (!user?.isActive || !(await bcrypt.compare(input.password, user.passwordHash))) throw invalid();
@@ -82,7 +88,12 @@ export const authService = {
   async me(userId: string, token: { role: UserRole; tenantId: string; iat?: number; exp?: number }) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: { memberships: { include: { tenant: true } } },
+      select: {
+        id: true, fullName: true, email: true, isActive: true,
+        memberships: {
+          select: { role: true, tenantId: true, tenant: { select: { id: true, slug: true, name: true, isActive: true } } },
+        },
+      },
     });
     if (!user?.isActive) throw new AppError(401, 'UNAUTHORIZED', 'No autenticado');
 
