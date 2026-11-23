@@ -4,9 +4,11 @@ import { env } from './config/env.js';
 import { errorHandler } from './common/errors/error-handler.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { tenantsRoutes } from './modules/tenants/tenants.routes.js';
+import { merchantRoutes } from './modules/merchant/merchant.routes.js';
 
 export async function buildApp() {
-  const app = Fastify({ logger: env.NODE_ENV !== 'test' });
+  // 2 MB: deja margen para logos enviados como data URL (ver imageRefSchema).
+  const app = Fastify({ logger: env.NODE_ENV !== 'test', bodyLimit: 2 * 1024 * 1024 });
 
   await app.register(cors, {
     origin: (origin, cb) => {
@@ -22,6 +24,7 @@ export async function buildApp() {
   app.register(async (api) => {
     api.register(authRoutes, { prefix: '/auth' });
     api.register(tenantsRoutes, { prefix: '/tenants' });
+    api.register(merchantRoutes, { prefix: '/merchant' });
   }, { prefix: '/api' });
 
   return app;
