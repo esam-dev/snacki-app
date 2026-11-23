@@ -35,6 +35,7 @@
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8100,http://localhost:4200,capacitor://localhost,ionic://localhost}
       PLATFORM_TENANT_NAME: ${PLATFORM_TENANT_NAME:-Snacki}
       PLATFORM_TENANT_SLUG: ${PLATFORM_TENANT_SLUG:-snacki}
+      SEED_DEMO_USERS: ${SEED_DEMO_USERS:-false}
     ports:
       - "3000:3000"
 
