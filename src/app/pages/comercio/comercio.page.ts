@@ -1,64 +1,549 @@
-﻿import { Component, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { Router } from '@angular/router';
-import { IonButton, IonContent, IonInput, ToastController } from '@ionic/angular';
+import { AlertController, IonButtons, IonContent, IonFooter, IonHeader, IonIcon, IonModal, IonSpinner, IonTitle, IonToolbar, ToastController } from '@ionic/angular';
+import { addIcons } from 'ionicons';
+import {
+  addOutline,
+  calendarOutline,
+  checkmarkCircle,
+  chevronForwardOutline,
+  closeOutline,
+  createOutline,
+  ellipseOutline,
+  giftOutline,
+  gridOutline,
+  imageOutline,
+  locationOutline,
+  logOutOutline,
+  mapOutline,
+  openOutline,
+  navigateOutline,
+  pricetagsOutline,
+  refreshOutline,
+  rocketOutline,
+  settingsOutline,
+  statsChartOutline,
+  storefrontOutline,
+  timeOutline,
+  trashOutline,
+  cloudUploadOutline,
+} from 'ionicons/icons';
 import { AuthService } from '../../services/auth.service';
-import { Local, Producto, StoreService } from '../../services/store.service';
-import { SnackiHeaderComponent } from '../../shared/snacki-header/snacki-header.component';
+import { MerchantProduct, MerchantReward, MerchantService, MerchantSettings } from '../../services/merchant.service';
+
+type ModalKind = 'promo' | 'reward' | 'settings' | 'map' | null;
+type Section = 'inicio' | 'promos' | 'recompensas';
+type PromoStatus = 'activa' | 'programada' | 'finalizada' | 'pausada';
+
+interface SetupTask {
+  label: string;
+  done: boolean;
+  action: () => void;
+}
+
+export const CATEGORIAS = [
+  { value: 'comida_rapida', label: 'Comida rápida' },
+  { value: 'pizza', label: 'Pizza' },
+  { value: 'helado', label: 'Heladería' },
+  { value: 'cafe', label: 'Cafetería' },
+  { value: 'otro', label: 'Otro' },
+];
 
 @Component({
   selector: 'app-comercio',
   templateUrl: './comercio.page.html',
   styleUrls: ['./comercio.page.scss'],
-  imports: [IonContent, IonButton, IonInput, FormsModule, DecimalPipe, SnackiHeaderComponent],
+  imports: [IonContent, IonFooter, IonHeader, IonToolbar, IonTitle, IonButtons, IonIcon, IonModal, IonSpinner, FormsModule, DecimalPipe, DatePipe],
 })
 export class ComercioPage {
   private auth = inject(AuthService);
-  private stores = inject(StoreService);
+  private merchant = inject(MerchantService);
   private router = inject(Router);
   private toast = inject(ToastController);
+  private alert = inject(AlertController);
+  private cdr = inject(ChangeDetectorRef);
+  private sanitizer = inject(DomSanitizer);
 
-  comercio?: Local = this.stores.getById(this.auth.currentUser?.comercioId);
+  /** URL del mapa embebido; se calcula al abrir el modal para no recrear el iframe en cada ciclo. */
+  mapEmbedUrl: SafeResourceUrl | null = null;
+  /** Vista previa del mapa dentro del modal de configuración. */
+  settingsMapUrl: SafeResourceUrl | null = null;
+  private abrirSettingsTrasMapa = false;
+
+  readonly categorias = CATEGORIAS;
+
+  rewards: MerchantReward[] = [];
+  products: MerchantProduct[] = [];
+  settings?: MerchantSettings;
+  loading = false;
+
+  section: Section = 'inicio';
+  modal: ModalKind = null;
+  saving = false;
+
+  // promo form
+  editingPromoId: string | null = null;
+  nombrePromo = '';
+  descripcionPromo = '';
+  puntosPromo: number | string | null = null;
+  promoStartsAt = '';
+  promoEndsAt = '';
+  promoActiva = true;
+
+  // reward form
+  editingRewardId: string | null = null;
   nombreRecompensa = '';
+  descripcionRecompensa = '';
   costoPuntos: number | string | null = null;
-  agregando = false;
 
-  ionViewWillEnter() {
-    this.comercio = this.stores.getById(this.auth.currentUser?.comercioId);
+  // settings form
+  settingsName = '';
+  settingsCategory = 'otro';
+  settingsAddress = '';
+  settingsLat: number | string | null = null;
+  settingsLng: number | string | null = null;
+  settingsLogoUrl = '';
+  settingsPointsExpireAt = '';
+  procesandoLogo = false;
+
+  constructor() {
+    addIcons({
+      addOutline,
+      calendarOutline,
+      checkmarkCircle,
+      chevronForwardOutline,
+      closeOutline,
+      createOutline,
+      ellipseOutline,
+      giftOutline,
+      gridOutline,
+      imageOutline,
+      locationOutline,
+      logOutOutline,
+      mapOutline,
+      openOutline,
+      navigateOutline,
+      pricetagsOutline,
+      refreshOutline,
+      rocketOutline,
+      settingsOutline,
+      statsChartOutline,
+      storefrontOutline,
+      timeOutline,
+      trashOutline,
+      cloudUploadOutline,
+    });
   }
 
-  async agregarRecompensa() {
-    if (this.agregando) return;
-    this.agregando = true;
+  get comercioNombre(): string {
+    return this.settings?.name || this.auth.currentUser?.tenantName || this.auth.currentUser?.nombre || 'Comercio';
+  }
+
+  get iniciales(): string {
+    return this.comercioNombre
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase())
+      .join('');
+  }
+
+  get categoriaLabel(): string {
+    return this.categorias.find((c) => c.value === this.settings?.category)?.label || 'Sin categoría';
+  }
+
+  get promosActivas(): number {
+    return this.products.filter((p) => this.promoStatus(p) === 'activa').length;
+  }
+
+  get promosProgramadas(): number {
+    return this.products.filter((p) => this.promoStatus(p) === 'programada').length;
+  }
+
+  get recompensasActivas(): number {
+    return this.rewards.filter((r) => r.isActive).length;
+  }
+
+  get costoPromedio(): number {
+    if (!this.rewards.length) return 0;
+    return Math.round(this.rewards.reduce((acc, r) => acc + r.cost, 0) / this.rewards.length);
+  }
+
+  get diasParaExpirar(): number | null {
+    if (!this.settings?.pointsExpireAt) return null;
+    const diff = new Date(this.settings.pointsExpireAt).getTime() - Date.now();
+    return Math.max(0, Math.ceil(diff / 86_400_000));
+  }
+
+  get tieneUbicacion(): boolean {
+    return this.settings?.latitude != null && this.settings?.longitude != null;
+  }
+
+  get setupTasks(): SetupTask[] {
+    return [
+      { label: 'Sube el logo de tu tienda', done: !!this.settings?.logoUrl, action: () => this.abrirSettings() },
+      { label: 'Agrega la dirección', done: !!this.settings?.address, action: () => this.abrirSettings() },
+      { label: 'Fija la ubicación en el mapa', done: this.tieneUbicacion, action: () => this.abrirSettings() },
+      { label: 'Publica tu primera promo', done: this.products.length > 0, action: () => this.abrirPromo() },
+      { label: 'Crea una recompensa', done: this.rewards.length > 0, action: () => this.abrirRecompensa() },
+    ];
+  }
+
+  get setupProgress(): number {
+    const tasks = this.setupTasks;
+    return Math.round((tasks.filter((t) => t.done).length / tasks.length) * 100);
+  }
+
+  get promosVisibles(): MerchantProduct[] {
+    return this.section === 'inicio' ? this.products.slice(0, 4) : this.products;
+  }
+
+  get recompensasVisibles(): MerchantReward[] {
+    return this.section === 'inicio' ? this.rewards.slice(0, 4) : this.rewards;
+  }
+
+  promoStatus(p: MerchantProduct): PromoStatus {
+    if (!p.isActive) return 'pausada';
+    const now = Date.now();
+    if (new Date(p.promoStartsAt).getTime() > now) return 'programada';
+    if (new Date(p.promoEndsAt).getTime() < now) return 'finalizada';
+    return 'activa';
+  }
+
+  async ionViewWillEnter() {
+    await this.loadAll();
+  }
+
+  async loadAll() {
+    this.loading = true;
     try {
-      const puntos = Number(this.costoPuntos);
-      const costoValido = Number.isInteger(puntos) && puntos > 0 && puntos <= 100000;
-      if (!this.comercio || !costoValido || !this.stores.agregarRecompensa(this.comercio.id, this.nombreRecompensa, puntos)) {
-        await this.mostrar('Revisa el nombre y el costo en puntos. No repitas el nombre de otra recompensa.');
-        return;
-      }
-      this.nombreRecompensa = '';
-      this.costoPuntos = null;
-      this.comercio = this.stores.getById(this.comercio.id);
-      await this.mostrar('Recompensa agregada al catálogo.');
+      const [rewards, products, settings] = await Promise.all([
+        this.merchant.listRewards(),
+        this.merchant.listProducts(),
+        this.merchant.getSettings(),
+      ]);
+      this.rewards = rewards;
+      this.products = products;
+      this.settings = settings;
+    } catch (e: any) {
+      await this.mostrar(this.errorMsg(e) || 'No se pudieron cargar datos del comercio.');
     } finally {
-      this.agregando = false;
+      this.loading = false;
+      this.cdr.markForCheck();
     }
   }
 
-  async eliminarRecompensa(producto: Producto) {
-    if (!this.comercio || !this.stores.eliminarRecompensa(this.comercio.id, producto.nombre)) {
-      await this.mostrar('Las recompensas iniciales de la demo no se pueden eliminar.');
+  setSection(s: Section) {
+    this.section = s;
+  }
+
+  abrirPromo(p?: MerchantProduct) {
+    this.editingPromoId = p?.id ?? null;
+    this.nombrePromo = p?.name ?? '';
+    this.descripcionPromo = p?.description ?? '';
+    this.puntosPromo = p?.points ?? null;
+    this.promoStartsAt = p ? this.toLocalInput(p.promoStartsAt) : '';
+    this.promoEndsAt = p ? this.toLocalInput(p.promoEndsAt) : '';
+    this.promoActiva = p?.isActive ?? true;
+    this.modal = 'promo';
+  }
+
+  abrirRecompensa(r?: MerchantReward) {
+    this.editingRewardId = r?.id ?? null;
+    this.nombreRecompensa = r?.name ?? '';
+    this.descripcionRecompensa = r?.description ?? '';
+    this.costoPuntos = r?.cost ?? null;
+    this.modal = 'reward';
+  }
+
+  abrirSettings() {
+    const s = this.settings;
+    this.settingsName = s?.name || '';
+    this.settingsCategory = s?.category || 'otro';
+    this.settingsAddress = s?.address || '';
+    this.settingsLat = s?.latitude ?? null;
+    this.settingsLng = s?.longitude ?? null;
+    this.settingsLogoUrl = s?.logoUrl || '';
+    this.settingsPointsExpireAt = s?.pointsExpireAt ? s.pointsExpireAt.slice(0, 10) : '';
+    this.actualizarMapaSettings();
+    this.modal = 'settings';
+  }
+
+  abrirMapa() {
+    if (!this.tieneUbicacion) {
+      this.abrirSettings();
+      this.mostrar('Agrega la ubicación de tu tienda para verla en el mapa.');
       return;
     }
-    this.comercio = this.stores.getById(this.comercio.id);
-    await this.mostrar('Recompensa eliminada.');
+    const lat = Number(this.settings!.latitude);
+    const lng = Number(this.settings!.longitude);
+    this.mapEmbedUrl = this.buildMapUrl(lat, lng);
+    this.modal = 'map';
+  }
+
+  /** Recalcula la vista previa del mapa del modal de configuración con las coordenadas del formulario. */
+  actualizarMapaSettings() {
+    const lat = this.settingsLat === '' || this.settingsLat === null ? NaN : Number(this.settingsLat);
+    const lng = this.settingsLng === '' || this.settingsLng === null ? NaN : Number(this.settingsLng);
+    const valido = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+    this.settingsMapUrl = valido ? this.buildMapUrl(lat, lng) : null;
+  }
+
+  private buildMapUrl(lat: number, lng: number): SafeResourceUrl {
+    const d = 0.004;
+    const url =
+      `https://www.openstreetmap.org/export/embed.html?bbox=${lng - d},${lat - d},${lng + d},${lat + d}` +
+      `&layer=mapnik&marker=${lat},${lng}`;
+    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  }
+
+  get googleMapsUrl(): string {
+    return `https://www.google.com/maps/search/?api=1&query=${this.settings?.latitude},${this.settings?.longitude}`;
+  }
+
+  editarUbicacion() {
+    // Se abre la configuración cuando el modal del mapa termina de cerrarse (ver onModalDismiss).
+    this.abrirSettingsTrasMapa = true;
+    this.modal = null;
+  }
+
+  /** Cada modal solo se cierra a sí mismo: evita que un didDismiss tardío cierre el modal siguiente. */
+  onModalDismiss(kind: Exclude<ModalKind, null>) {
+    if (this.modal === kind) this.modal = null;
+    if (kind === 'map' && this.abrirSettingsTrasMapa) {
+      this.abrirSettingsTrasMapa = false;
+      this.abrirSettings();
+    }
+    this.cdr.markForCheck();
+  }
+
+  cerrarModal() {
+    this.modal = null;
+  }
+
+  async guardarPromo() {
+    if (this.saving) return;
+    const puntos = Number(this.puntosPromo);
+    const puntosValido = Number.isInteger(puntos) && puntos > 0 && puntos <= 100000;
+    const nombre = this.nombrePromo.trim();
+    if (!nombre || !puntosValido || !this.promoStartsAt || !this.promoEndsAt) {
+      await this.mostrar('Completa nombre, puntos y fechas de inicio y fin.');
+      return;
+    }
+    const inicio = new Date(this.promoStartsAt);
+    const fin = new Date(this.promoEndsAt);
+    if (fin <= inicio) {
+      await this.mostrar('La fecha de fin debe ser posterior a la de inicio.');
+      return;
+    }
+    const editando = !!this.editingPromoId;
+    this.saving = true;
+    try {
+      const payload = {
+        name: nombre,
+        description: this.descripcionPromo.trim() || null,
+        points: puntos,
+        promoStartsAt: inicio.toISOString(),
+        promoEndsAt: fin.toISOString(),
+        isActive: this.promoActiva,
+      };
+      if (this.editingPromoId) {
+        await this.merchant.updateProduct(this.editingPromoId, payload);
+      } else {
+        await this.merchant.createProduct(payload);
+      }
+      this.modal = null;
+      await this.loadAll();
+      await this.mostrar(editando ? 'Promo actualizada.' : 'Promo publicada.');
+    } catch (e: any) {
+      await this.mostrar(this.errorMsg(e) || 'No se pudo guardar la promo.');
+    } finally {
+      this.saving = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async eliminarPromo(product: MerchantProduct) {
+    if (!(await this.confirmar('Eliminar promo', `¿Seguro que quieres eliminar "${product.name}"?`))) return;
+    try {
+      await this.merchant.deleteProduct(product.id);
+      await this.loadAll();
+      await this.mostrar('Promo eliminada.');
+    } catch (e: any) {
+      await this.mostrar(this.errorMsg(e) || 'No se pudo eliminar la promo.');
+    }
+  }
+
+  async guardarRecompensa() {
+    if (this.saving) return;
+    const puntos = Number(this.costoPuntos);
+    const costoValido = Number.isInteger(puntos) && puntos > 0 && puntos <= 100000;
+    const nombre = this.nombreRecompensa.trim();
+    if (!nombre || !costoValido) {
+      await this.mostrar('Revisa el nombre y el costo en puntos.');
+      return;
+    }
+    const editando = !!this.editingRewardId;
+    this.saving = true;
+    try {
+      const payload = { name: nombre, description: this.descripcionRecompensa.trim() || null, cost: puntos };
+      if (this.editingRewardId) {
+        await this.merchant.updateReward(this.editingRewardId, payload);
+      } else {
+        await this.merchant.createReward(payload);
+      }
+      this.modal = null;
+      await this.loadAll();
+      await this.mostrar(editando ? 'Recompensa actualizada.' : 'Recompensa creada.');
+    } catch (e: any) {
+      await this.mostrar(this.errorMsg(e) || 'No se pudo guardar la recompensa.');
+    } finally {
+      this.saving = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async eliminarRecompensa(reward: MerchantReward) {
+    if (!(await this.confirmar('Eliminar recompensa', `¿Seguro que quieres eliminar "${reward.name}"?`))) return;
+    try {
+      await this.merchant.deleteReward(reward.id);
+      await this.loadAll();
+      await this.mostrar('Recompensa eliminada.');
+    } catch (e: any) {
+      await this.mostrar(this.errorMsg(e) || 'No se pudo eliminar la recompensa.');
+    }
+  }
+
+  async guardarSettings() {
+    if (this.saving || this.procesandoLogo) return;
+    if (!this.settingsName.trim()) {
+      await this.mostrar('El nombre de la tienda es obligatorio.');
+      return;
+    }
+    this.saving = true;
+    try {
+      await this.merchant.updateSettings({
+        name: this.settingsName.trim(),
+        category: this.settingsCategory,
+        address: this.settingsAddress.trim() || null,
+        latitude: this.settingsLat === '' || this.settingsLat === null ? null : Number(this.settingsLat),
+        longitude: this.settingsLng === '' || this.settingsLng === null ? null : Number(this.settingsLng),
+        logoUrl: this.settingsLogoUrl.trim() || null,
+        pointsExpireAt: this.settingsPointsExpireAt ? new Date(this.settingsPointsExpireAt).toISOString() : null,
+      });
+      this.modal = null;
+      await this.loadAll();
+      await this.mostrar('Configuración guardada.');
+    } catch (e: any) {
+      await this.mostrar(this.errorMsg(e) || 'No se pudo guardar la configuración.');
+    } finally {
+      this.saving = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  usarMiUbicacion() {
+    if (!navigator.geolocation) {
+      this.mostrar('Tu navegador no permite obtener la ubicación.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        this.settingsLat = Number(pos.coords.latitude.toFixed(6));
+        this.settingsLng = Number(pos.coords.longitude.toFixed(6));
+        this.actualizarMapaSettings();
+        this.cdr.markForCheck();
+      },
+      () => this.mostrar('No se pudo obtener tu ubicación.'),
+    );
+  }
+
+  // ---------- logo ----------
+
+  async onLogoSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = ''; // permite volver a elegir el mismo archivo
+    if (!file) return;
+    if (!['image/png', 'image/jpeg'].includes(file.type)) {
+      await this.mostrar('El logo debe ser una imagen PNG o JPG.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      await this.mostrar('La imagen supera los 5 MB.');
+      return;
+    }
+    this.procesandoLogo = true;
+    this.cdr.markForCheck();
+    try {
+      this.settingsLogoUrl = await this.redimensionarImagen(file, 512);
+    } catch {
+      await this.mostrar('No se pudo leer la imagen.');
+    } finally {
+      this.procesandoLogo = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  quitarLogo() {
+    this.settingsLogoUrl = '';
+  }
+
+  /** Reduce la imagen a `max` px de lado y la devuelve como data URL (PNG conserva transparencia). */
+  private redimensionarImagen(file: File, max: number): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('canvas'));
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(file.type === 'image/png' ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('image'));
+      };
+      img.src = url;
+    });
   }
 
   async cerrarSesion() {
     await this.auth.cerrarSesion();
     this.router.navigateByUrl('/login');
+  }
+
+  private toLocalInput(iso: string): string {
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  private async confirmar(header: string, message: string): Promise<boolean> {
+    const alert = await this.alert.create({
+      header,
+      message,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        { text: 'Eliminar', role: 'destructive' },
+      ],
+    });
+    await alert.present();
+    const { role } = await alert.onDidDismiss();
+    return role === 'destructive';
+  }
+
+  private errorMsg(e: any): string | undefined {
+    const err = e?.error?.error;
+    return err?.details?.[0]?.message || err?.message;
   }
 
   private async mostrar(message: string) {

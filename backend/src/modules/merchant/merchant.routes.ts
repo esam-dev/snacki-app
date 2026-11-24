@@ -1,0 +1,73 @@
+import type { FastifyInstance } from 'fastify';
+import { authenticate, authorizeRoles } from '../../common/middleware/authenticate.js';
+import {
+  createProductSchema,
+  updateProductSchema,
+  createRewardSchema,
+  updateRewardSchema,
+  updateMerchantSettingsSchema,
+} from './merchant.schemas.js';
+import { merchantService } from './merchant.service.js';
+
+export async function merchantRoutes(app: FastifyInstance) {
+  // All merchant routes require auth + comercio role
+  app.addHook('preHandler', authenticate);
+  app.addHook('preHandler', authorizeRoles('comercio'));
+
+  // Products
+  app.get('/products', async (request, reply) => {
+    const products = await merchantService.listProducts(request.authUser?.tenantId);
+    return reply.send({ data: { products } });
+  });
+
+  app.post('/products', async (request, reply) => {
+    const product = await merchantService.createProduct(request.authUser?.tenantId, createProductSchema.parse(request.body));
+    return reply.status(201).send({ data: { product } });
+  });
+
+  app.patch('/products/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const product = await merchantService.updateProduct(request.authUser?.tenantId, id, updateProductSchema.parse(request.body));
+    return reply.send({ data: { product } });
+  });
+
+  app.delete('/products/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const result = await merchantService.deleteProduct(request.authUser?.tenantId, id);
+    return reply.send({ data: result });
+  });
+
+  // Rewards
+  app.get('/rewards', async (request, reply) => {
+    const rewards = await merchantService.listRewards(request.authUser?.tenantId);
+    return reply.send({ data: { rewards } });
+  });
+
+  app.post('/rewards', async (request, reply) => {
+    const reward = await merchantService.createReward(request.authUser?.tenantId, createRewardSchema.parse(request.body));
+    return reply.status(201).send({ data: { reward } });
+  });
+
+  app.patch('/rewards/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const reward = await merchantService.updateReward(request.authUser?.tenantId, id, updateRewardSchema.parse(request.body));
+    return reply.send({ data: { reward } });
+  });
+
+  app.delete('/rewards/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const result = await merchantService.deleteReward(request.authUser?.tenantId, id);
+    return reply.send({ data: result });
+  });
+
+  // Settings
+  app.get('/settings', async (request, reply) => {
+    const settings = await merchantService.getSettings(request.authUser?.tenantId);
+    return reply.send({ data: { settings } });
+  });
+
+  app.patch('/settings', async (request, reply) => {
+    const settings = await merchantService.updateSettings(request.authUser?.tenantId, updateMerchantSettingsSchema.parse(request.body));
+    return reply.send({ data: { settings } });
+  });
+}
