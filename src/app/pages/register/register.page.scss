@@ -1,0 +1,14 @@
+.avatar {
+  width: 94px;
+  height: 94px;
+  margin: 0 auto 8px;
+  svg { width: 100%; height: 100%; display: block; }
+}
+.center { display: flex; justify-content: center; margin-bottom: 8px; }
+.small-pill { min-width: 0; --padding-start: 16px; --padding-end: 16px; height: 28px; font-size: 13px; }
+.register-title { margin: 8px 0 12px; text-align: center; font-size: 22px; }
+.register-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 18px; }
+.register-switch button { min-height: 34px; border: 1px solid #e3e5eb; border-radius: 10px; background: #fff; color: #4c5260; font-size: 13px; font-weight: 600; }
+.register-switch button.active { border-color: var(--ion-color-primary); background: #f3f7ff; color: var(--ion-color-primary); }
+
+/* Campo con botón de mostrar/ocultar: patrón global .with-icon/.eye */

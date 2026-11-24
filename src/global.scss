@@ -1,12 +1,9 @@
 /*
- * App Global CSS
+ * Global CSS
  * ----------------------------------------------------------------------------
- * Put style rules here that you want to apply globally. These styles are for
- * the entire app and not just one component. Additionally, this file can be
- * used as an entry point to import other CSS/Sass files to be included in the
- * output CSS.
- * For more information on global stylesheets, visit the documentation:
- * https://ionicframework.com/docs/layout/global-stylesheets
+ * Core de Ionic + sistema de diseño de Snacki (réplica de Figma).
+ * Los estilos de Ionic se importan aquí porque angular.json solo referencia
+ * este archivo y src/theme/variables.scss.
  */
 
 /* Core CSS required for Ionic components to work properly */
@@ -25,13 +22,135 @@
 @import "@ionic/angular/css/text-transformation.css";
 @import "@ionic/angular/css/flex-utils.css";
 
-/**
- * Ionic Dark Mode
- * -----------------------------------------------------
- * For more info, please see:
- * https://ionicframework.com/docs/theming/dark-mode
- */
+/* ===== Estilos globales de Snacki ===== */
 
-/* @import "@ionic/angular/css/palettes/dark.always.css"; */
-/* @import "@ionic/angular/css/palettes/dark.class.css"; */
-@import '@ionic/angular/css/palettes/dark.system.css';
+html, body { background: #fff; }
+
+/* Contenedor estándar de las pantallas */
+.snacki-page {
+  --background: #fff;
+  --padding-start: 16px;
+  --padding-end: 16px;
+  --padding-bottom: 16px;
+}
+
+/* Campo de texto con forma de píldora (como en Figma) */
+ion-input.snacki-input {
+  --background: transparent;
+  --padding-start: 20px;
+  --padding-end: 20px;
+  --placeholder-color: #7a7a80;
+  --placeholder-opacity: 1;
+  background: var(--snacki-input-bg);
+  border-radius: 999px;
+  overflow: hidden;
+  min-height: 44px;
+  font-size: 14px;
+  margin-bottom: 14px;
+}
+
+/* Etiquetas de los formularios */
+.snacki-label {
+  display: block;
+  font-size: 14px;
+  margin: 0 0 6px 6px;
+}
+
+/* Campo con botón de mostrar/ocultar (patrón compartido: login, register, perfil) */
+.with-icon {
+  position: relative;
+
+  .eye {
+    position: absolute;
+    right: 16px;
+    top: 11px;
+    background: none;
+    border: 0;
+    padding: 0;
+    color: #222;
+    ion-icon { font-size: 22px; }
+  }
+}
+
+/* Botón pill azul */
+ion-button.snacki-btn {
+  --border-radius: 24px;
+  --box-shadow: none;
+  --padding-start: 28px;
+  --padding-end: 28px;
+  min-width: 150px;
+  height: 36px;
+  font-weight: 700;
+  font-size: 14px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+ion-button.snacki-btn.small {
+  --padding-start: 10px;
+  --padding-end: 10px;
+  min-width: 0;
+  height: 22px;
+  font-size: 11px;
+  --border-radius: 6px;
+}
+
+/* Tarjeta con sombra */
+.snacki-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.28);
+}
+
+/* Cuadrícula de tarjetas (locales / productos) */
+.item-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 16px;
+}
+.item-card {
+  @extend .snacki-card;
+  overflow: hidden;
+  cursor: pointer;
+
+  .media {
+    background: var(--snacki-card-media);
+    aspect-ratio: 1 / 1.05;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+
+    img {
+      max-width: 90%;
+      max-height: 90%;
+      object-fit: contain;
+    }
+  }
+  .info {
+    padding: 8px 12px 6px;
+    .name { font-size: 15px; min-height: 36px; }
+    .pts  { font-size: 15px; text-align: right; }
+  }
+}
+
+/* Texto de ayuda: pequeño y en mayúsculas */
+.caption {
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #444;
+}
+
+/* Checkbox circular gris con texto multi-línea */
+ion-checkbox.snacki-check {
+  --size: 22px;
+  --border-radius: 50%;
+  --border-color: #d3d3d3;
+  --checkbox-background: #d3d3d3;
+  --checkbox-background-checked: var(--ion-color-primary);
+  --border-color-checked: var(--ion-color-primary);
+  font-size: 14px;
+  margin: 6px 0;
+  &::part(label) { white-space: normal; }
+}

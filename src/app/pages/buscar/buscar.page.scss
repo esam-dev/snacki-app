@@ -1,0 +1,10 @@
+ion-searchbar {
+  --border-radius: 24px;
+  --background: var(--snacki-input-bg);
+  --box-shadow: none;
+  padding: 0;
+}
+.empty { grid-column: 1 / -1; text-align: center; color: #666; margin-top: 24px; }
+
+/* En Buscar solo se muestra el nombre del local */
+.item-card .info .name { min-height: 0; padding-bottom: 4px; }

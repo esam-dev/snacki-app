@@ -1,0 +1,7 @@
+.points-card {
+  margin: 16px 12px 0;
+  padding: 10px 14px 12px;
+
+  .caption { display: flex; align-items: center; gap: 6px; ion-icon { font-size: 16px; } }
+  .value { font-size: 17px; margin-top: 8px; }
+}
