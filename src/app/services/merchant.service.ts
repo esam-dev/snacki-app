@@ -42,6 +42,19 @@ export interface MerchantSettings {
   isActive: boolean;
 }
 
+/** QR de compra emitido por el comercio. `qrContent` es lo que se codifica en la imagen. */
+export interface MerchantQr {
+  claimId: string;
+  token: string;
+  qrContent: string;
+  expiresAt: string;
+  points: number;
+  quantity: number;
+  product: { id: string; name: string; points: number };
+}
+
+export type MerchantQrStatus = 'pending' | 'claimed' | 'expired';
+
 @Injectable({ providedIn: 'root' })
 export class MerchantService {
   private readonly http = inject(HttpClient);
@@ -85,6 +98,24 @@ export class MerchantService {
 
   async deleteReward(id: string): Promise<void> {
     await firstValueFrom(this.http.delete(`${this.base}/rewards/${id}`));
+  }
+
+  // QR de compra
+  async createQr(productId: string, quantity: number): Promise<MerchantQr> {
+    const res = await firstValueFrom(this.http.post<{ data: MerchantQr }>(`${this.base}/qr`, { productId, quantity }));
+    return res.data;
+  }
+
+  async getQrStatus(claimId: string): Promise<{ status: MerchantQrStatus; claimedAt: string | null; expiresAt: string }> {
+    const res = await firstValueFrom(
+      this.http.get<{ data: { status: MerchantQrStatus; claimedAt: string | null; expiresAt: string } }>(`${this.base}/qr/${claimId}`),
+    );
+    return res.data;
+  }
+
+  /** Anula un QR aún no canjeado (venta cancelada o generado por error). */
+  async voidQr(claimId: string): Promise<void> {
+    await firstValueFrom(this.http.post(`${this.base}/qr/${claimId}/void`, {}));
   }
 
   // Settings

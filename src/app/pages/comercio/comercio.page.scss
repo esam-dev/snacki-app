@@ -190,3 +190,30 @@ select.field-input{appearance:none;background-image:linear-gradient(45deg,transp
   .dash-columns:not(.single){grid-template-columns:1fr 1fr}
 }
 
+// ===== QR de venta =====
+.panel-head-actions{display:flex;gap:8px;flex-shrink:0}
+.icon-btn.accent{color:$primary}
+.icon-btn:disabled{opacity:.4;cursor:default}
+.qr-intro{display:flex;gap:10px;margin:0 0 4px;padding:12px;border-radius:$radius;background:$primary-soft;color:$text-2;font-size:13px;line-height:1.45}
+.qr-intro app-icon{font-size:18px;color:$primary;margin-top:1px}
+.qty-stepper{display:inline-flex;align-items:center;gap:12px}
+.qty-value{min-width:32px;text-align:center;font-size:18px;font-weight:700;color:$text}
+.qr-summary{display:flex;align-items:baseline;justify-content:space-between;margin-top:20px;padding:14px 16px;border:1px solid $border;border-radius:$radius;color:$muted;font-size:14px}
+.qr-summary strong{font-size:22px;color:$primary}
+.qr-result{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding-top:4px}
+.qr-box{position:relative;width:min(280px,100%);aspect-ratio:1;padding:10px;border:1px solid $border;border-radius:12px;background:#fff}
+.qr-box img{display:block;width:100%;height:100%;image-rendering:pixelated}
+.qr-box.dimmed img{opacity:.12}
+.qr-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-weight:700;font-size:16px}
+.qr-overlay app-icon{font-size:48px}
+.qr-overlay.ok{color:$success}.qr-overlay.off{color:$subtle}
+.qr-points{margin-top:10px;font-size:28px;color:$text}
+.qr-product{font-size:14px;color:$text-2}
+.qr-state{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:6px 12px;border-radius:999px;font-size:13px;font-weight:600}
+.qr-state ion-spinner{width:20px;height:20px}
+.qr-state.pending{background:$primary-soft;color:$primary}
+.qr-state.ok{background:#e6f4ec;color:$success}
+.qr-state.off{background:#f0f2f5;color:$muted}
+.qr-note{max-width:340px;margin:8px 0 0;font-size:12px;line-height:1.45;color:$subtle}
+@media (max-width:520px){.panel-head{flex-wrap:wrap}.panel-head-actions{width:100%}.panel-head-actions .btn{flex:1}}
+.qr-void{margin-top:4px}

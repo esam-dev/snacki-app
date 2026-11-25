@@ -121,9 +121,16 @@
             <h2>Productos promocionales</h2>
             <p class="panel-sub">{{ promosActivas }} activas · {{ products.length }} en total</p>
           </div>
-          <button class="btn btn-primary" type="button" (click)="abrirPromo()">
-            <app-icon name="plus" /> Crear
-          </button>
+          <div class="panel-head-actions">
+            @if (promosActivas) {
+              <button class="btn btn-secondary" type="button" title="Genera un QR para que el cliente sume puntos por su compra" (click)="abrirQr()">
+                <app-icon name="qr" /> Generar QR
+              </button>
+            }
+            <button class="btn btn-primary" type="button" (click)="abrirPromo()">
+              <app-icon name="plus" /> Crear
+            </button>
+          </div>
         </div>
         @if (promosVisibles.length) {
           <ul class="row-list">
@@ -136,6 +143,9 @@
                 </div>
                 <span class="status" [class]="'status status-' + promoStatus(p)">{{ promoStatus(p) }}</span>
                 <div class="row-actions">
+                  @if (promoStatus(p) === 'activa') {
+                    <button class="icon-btn sm accent" type="button" [attr.aria-label]="'Generar QR de ' + p.name" title="Generar QR de venta" (click)="abrirQr(p)"><app-icon name="qr" /></button>
+                  }
                   <button class="icon-btn sm" type="button" aria-label="Editar" title="Editar" (click)="abrirPromo(p)"><app-icon name="pencil" /></button>
                   <button class="icon-btn sm danger" type="button" aria-label="Eliminar" title="Eliminar" (click)="eliminarPromo(p)"><app-icon name="trash" /></button>
                 </div>
@@ -388,6 +398,92 @@
         <button class="btn btn-primary" type="button" [disabled]="saving || procesandoLogo" (click)="guardarSettings()">
           {{ saving ? 'Guardando...' : 'Guardar configuración' }}
         </button>
+      </ion-footer>
+    </ng-template>
+  </ion-modal>
+
+  <!-- Modal: QR de venta -->
+  <ion-modal class="dash-modal" [isOpen]="modal === 'qr'" (didDismiss)="onModalDismiss('qr')">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>{{ qrResult ? 'Muestra este QR al cliente' : 'Generar QR de venta' }}</ion-title>
+          <ion-buttons slot="end">
+            <button class="icon-btn ghost" type="button" aria-label="Cerrar" (click)="cerrarModal()"><app-icon name="close" /></button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="modal-body">
+        @if (!qrResult) {
+          <p class="qr-intro">
+            <app-icon name="info" />
+            <span>Cuando vendas un producto en promo, genera su QR. El cliente lo escanea con Snacki y suma los puntos en tu tienda.</span>
+          </p>
+
+          <label class="field-label" for="qr-promo">¿Qué vendiste? *</label>
+          <select id="qr-promo" class="field-input" [(ngModel)]="qrProductId">
+            @for (p of promosParaQr; track p.id) {
+              <option [value]="p.id">{{ p.name }} · {{ p.points | number }} pts</option>
+            }
+          </select>
+
+          <label class="field-label">Cantidad</label>
+          <div class="qty-stepper">
+            <button class="icon-btn" type="button" aria-label="Quitar una unidad" [disabled]="qrCantidad <= 1" (click)="cambiarCantidadQr(-1)"><app-icon name="minus" /></button>
+            <span class="qty-value" aria-live="polite">{{ qrCantidad }}</span>
+            <button class="icon-btn" type="button" aria-label="Agregar una unidad" [disabled]="qrCantidad >= qrMaxCantidad" (click)="cambiarCantidadQr(1)"><app-icon name="plus" /></button>
+          </div>
+
+          <div class="qr-summary">
+            <span>El cliente sumará</span>
+            <strong>{{ qrPuntosTotales | number }} pts</strong>
+          </div>
+        } @else {
+          <div class="qr-result">
+            <div class="qr-box" [class.dimmed]="qrStatus !== 'pending'">
+              <img [src]="qrImage" [alt]="'QR de ' + qrResult.product.name" />
+              @if (qrStatus === 'claimed') {
+                <div class="qr-overlay ok"><app-icon name="circle-check" /><span>Escaneado</span></div>
+              } @else if (qrStatus === 'expired') {
+                <div class="qr-overlay off"><app-icon name="clock" /><span>{{ qrAnulado ? 'Anulado' : 'Venció' }}</span></div>
+              }
+            </div>
+            <strong class="qr-points">+{{ qrResult.points | number }} pts</strong>
+            <span class="qr-product">{{ qrResult.product.name }}@if (qrResult.quantity > 1) { × {{ qrResult.quantity }} }</span>
+
+            @switch (qrStatus) {
+              @case ('pending') {
+                <span class="qr-state pending"><ion-spinner name="dots"></ion-spinner> Esperando que el cliente lo escanee</span>
+              }
+              @case ('claimed') {
+                <span class="qr-state ok"><app-icon name="circle-check" /> ¡Listo! El cliente ya sumó sus puntos</span>
+              }
+              @case ('expired') {
+                <span class="qr-state off"><app-icon name="clock" /> {{ qrAnulado ? 'QR anulado: ya nadie puede usarlo.' : 'Este QR venció. Genera uno nuevo.' }}</span>
+              }
+            }
+
+            @if (qrStatus === 'pending') {
+              <p class="qr-note">Sirve una sola vez · vence en {{ qrRestante }} ({{ qrResult.expiresAt | date:'dd/MM HH:mm' }}). Si el cliente no tiene señal, puede escanearlo igual y se confirmará al reconectarse.</p>
+              <button class="btn btn-text danger qr-void" type="button" [disabled]="anulandoQr" (click)="anularQr()">
+                <app-icon name="close" /> {{ anulandoQr ? 'Anulando...' : 'Anular QR (venta cancelada)' }}
+              </button>
+            }
+          </div>
+        }
+      </ion-content>
+      <ion-footer class="modal-footer">
+        @if (!qrResult) {
+          <button class="btn btn-secondary" type="button" (click)="cerrarModal()">Cancelar</button>
+          <button class="btn btn-primary" type="button" [disabled]="generandoQr || !qrProductId" (click)="generarQr()">
+            <app-icon name="qr" /> {{ generandoQr ? 'Generando...' : 'Generar QR' }}
+          </button>
+        } @else {
+          <button class="btn btn-secondary" type="button" (click)="cerrarModal()">Cerrar</button>
+          <button class="btn btn-primary" type="button" (click)="nuevoQr()">
+            <app-icon name="refresh" /> Otra venta
+          </button>
+        }
       </ion-footer>
     </ng-template>
   </ion-modal>
