@@ -1,14 +1,19 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, effect, inject, untracked } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { IonContent, IonIcon, IonSearchbar } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { locationOutline, notificationsOutline, qrCodeOutline } from 'ionicons/icons';
-import { Local, Producto, StoreService } from '../../services/store.service';
+import { Local, Producto, Promo, StoreService } from '../../services/store.service';
 import { SnackiHeaderComponent } from '../../shared/snacki-header/snacki-header.component';
 import { AuthService } from '../../services/auth.service';
 
 interface OfertaHome extends Producto {
+  comercioId: string;
+  comercio: string;
+}
+
+interface PromoHome extends Promo {
   comercioId: string;
   comercio: string;
 }
@@ -28,6 +33,8 @@ export class HomePage implements OnInit {
   resultados: Local[] = this.locales;
   total = this.stores.totalPuntos;
   ofertas: OfertaHome[] = this.obtenerOfertas();
+  promos: PromoHome[] = this.obtenerPromos();
+  private busqueda = '';
 
   get nombreUsuario(): string {
     return this.auth.currentUser?.nombre || 'Usuario';
@@ -35,6 +42,11 @@ export class HomePage implements OnInit {
 
   constructor() {
     addIcons({ qrCodeOutline, notificationsOutline, locationOutline });
+    // Cada vez que se descarga el catálogo del servidor se vuelven a leer los datos de la pantalla.
+    effect(() => {
+      this.stores.catalogoVersion();
+      untracked(() => this.cargarDatos());
+    });
   }
 
   ngOnInit() {
@@ -43,11 +55,16 @@ export class HomePage implements OnInit {
 
   ionViewWillEnter() {
     this.cargarDatos();
+    void this.stores.refrescarCatalogo(3000);
   }
 
   filtrar(event: Event) {
-    const query = (event as CustomEvent).detail?.value ?? '';
-    this.resultados = this.stores.buscar(query);
+    this.busqueda = (event as CustomEvent).detail?.value ?? '';
+    this.resultados = this.stores.buscar(this.busqueda);
+  }
+
+  abrirPromo(promo: PromoHome) {
+    this.router.navigate(['/tabs/explorar', promo.comercioId]);
   }
 
   abrirComercio(local: Local) {
@@ -64,15 +81,26 @@ export class HomePage implements OnInit {
 
   private cargarDatos() {
     this.locales = this.stores.getAll();
-    this.resultados = this.locales;
+    this.resultados = this.stores.buscar(this.busqueda);
     this.total = this.stores.totalPuntos;
     this.ofertas = this.obtenerOfertas();
+    this.promos = this.obtenerPromos();
   }
 
   private obtenerOfertas(): OfertaHome[] {
     return this.stores.getAll().flatMap((local) =>
       local.productos.map((producto) => ({
         ...producto,
+        comercioId: local.id,
+        comercio: local.nombre,
+      })),
+    );
+  }
+
+  private obtenerPromos(): PromoHome[] {
+    return this.stores.getAll().flatMap((local) =>
+      local.promos.map((promo) => ({
+        ...promo,
         comercioId: local.id,
         comercio: local.nombre,
       })),
