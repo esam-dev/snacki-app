@@ -110,10 +110,13 @@ Abre http://localhost:4200. La app llama a la API definida en `src/environments/
 
 **Usuarios de prueba** (creados por el seed, contraseña `Demo1234!`):
 
-| Rol | Email |
-|---|---|
-| Cliente | `cliente@snacki.demo` |
-| Comercio | `comercio@snacki.demo` |
+| Rol | Email | Tienda |
+|---|---|---|
+| Cliente | `cliente@snacki.demo` | — |
+| Comercio | `comercio@snacki.demo` | Burger House |
+| Comercio | `heladeria@snacki.demo` | Heladería Polar |
+| Comercio | `cafeteria@snacki.demo` | Café Central |
+| Comercio | `pizzeria@snacki.demo` | Pizzería Napoli |
 
 > En el navegador la cámara y algunos plugins nativos (escáner, notificaciones) no funcionan igual que en el celular. Para probarlos usa Android.
 

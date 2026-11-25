@@ -106,6 +106,8 @@ model Product {
   promoStartsAt DateTime        @map("promo_starts_at")
   promoEndsAt   DateTime        @map("promo_ends_at")
   isActive      Boolean         @default(true) @map("is_active")
+  /// Borrado lógico: se archiva en vez de borrar si ya tiene ventas (QR), para no perder el historial de puntos.
+  deletedAt     DateTime?       @map("deleted_at")
   createdAt     DateTime        @default(now()) @map("created_at")
   updatedAt     DateTime        @updatedAt @map("updated_at")
 
@@ -125,6 +127,8 @@ model Reward {
   cost        Int
   imageUrl    String?  @map("image_url")
   isActive    Boolean  @default(true) @map("is_active")
+  /// Borrado lógico: se archiva en vez de borrar si ya tiene canjes.
+  deletedAt   DateTime? @map("deleted_at")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

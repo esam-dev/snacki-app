@@ -24,7 +24,7 @@ export const merchantService = {
     const tid = requireTenantId(tenantId);
     if (!userId) throw new AppError(401, 'UNAUTHORIZED', 'No autenticado');
 
-    const product = await prisma.product.findFirst({ where: { id: input.productId, tenantId: tid } });
+    const product = await prisma.product.findFirst({ where: { id: input.productId, tenantId: tid, deletedAt: null } });
     if (!product) throw new AppError(404, 'NOT_FOUND', 'Promo no encontrada');
 
     const now = new Date();
@@ -92,7 +92,7 @@ export const merchantService = {
   async listProducts(tenantId?: string) {
     const tid = requireTenantId(tenantId);
     return prisma.product.findMany({
-      where: { tenantId: tid },
+      where: { tenantId: tid, deletedAt: null },
       orderBy: { createdAt: 'desc' },
     });
   },
@@ -120,7 +120,7 @@ export const merchantService = {
 
   async updateProduct(tenantId: string | undefined, productId: string, input: UpdateProductInput) {
     const tid = requireTenantId(tenantId);
-    const existing = await prisma.product.findFirst({ where: { id: productId, tenantId: tid } });
+    const existing = await prisma.product.findFirst({ where: { id: productId, tenantId: tid, deletedAt: null } });
     if (!existing) throw new AppError(404, 'NOT_FOUND', 'Producto no encontrado');
 
     const data: any = {};
@@ -143,17 +143,30 @@ export const merchantService = {
 
   async deleteProduct(tenantId: string | undefined, productId: string) {
     const tid = requireTenantId(tenantId);
-    const existing = await prisma.product.findFirst({ where: { id: productId, tenantId: tid } });
+    const existing = await prisma.product.findFirst({ where: { id: productId, tenantId: tid, deletedAt: null } });
     if (!existing) throw new AppError(404, 'NOT_FOUND', 'Producto no encontrado');
-    await prisma.product.delete({ where: { id: productId } });
-    return { ok: true };
+    const sales = await prisma.purchaseClaim.count({ where: { productId } });
+    if (sales === 0) {
+      await prisma.product.delete({ where: { id: productId } });
+      return { ok: true, archived: false };
+    }
+    // Ya tiene ventas: se archiva para conservar el historial de puntos y se anulan sus QR sin canjear.
+    const now = new Date();
+    await prisma.$transaction([
+      prisma.purchaseClaim.updateMany({
+        where: { productId, claimedAt: null, expiresAt: { gt: now } },
+        data: { expiresAt: now },
+      }),
+      prisma.product.update({ where: { id: productId }, data: { deletedAt: now, isActive: false } }),
+    ]);
+    return { ok: true, archived: true };
   },
 
   // Rewards
   async listRewards(tenantId?: string) {
     const tid = requireTenantId(tenantId);
     return prisma.reward.findMany({
-      where: { tenantId: tid },
+      where: { tenantId: tid, deletedAt: null },
       orderBy: { createdAt: 'desc' },
     });
   },
@@ -174,7 +187,7 @@ export const merchantService = {
 
   async updateReward(tenantId: string | undefined, rewardId: string, input: UpdateRewardInput) {
     const tid = requireTenantId(tenantId);
-    const existing = await prisma.reward.findFirst({ where: { id: rewardId, tenantId: tid } });
+    const existing = await prisma.reward.findFirst({ where: { id: rewardId, tenantId: tid, deletedAt: null } });
     if (!existing) throw new AppError(404, 'NOT_FOUND', 'Recompensa no encontrada');
 
     const data: any = {};
@@ -189,10 +202,16 @@ export const merchantService = {
 
   async deleteReward(tenantId: string | undefined, rewardId: string) {
     const tid = requireTenantId(tenantId);
-    const existing = await prisma.reward.findFirst({ where: { id: rewardId, tenantId: tid } });
+    const existing = await prisma.reward.findFirst({ where: { id: rewardId, tenantId: tid, deletedAt: null } });
     if (!existing) throw new AppError(404, 'NOT_FOUND', 'Recompensa no encontrada');
-    await prisma.reward.delete({ where: { id: rewardId } });
-    return { ok: true };
+    const redemptions = await prisma.redemption.count({ where: { rewardId } });
+    if (redemptions === 0) {
+      await prisma.reward.delete({ where: { id: rewardId } });
+      return { ok: true, archived: false };
+    }
+    // Ya tiene canjes: se archiva para conservar el historial.
+    await prisma.reward.update({ where: { id: rewardId }, data: { deletedAt: new Date(), isActive: false } });
+    return { ok: true, archived: true };
   },
 
   // Settings

@@ -5,8 +5,9 @@ process.env.DATABASE_URL ??= 'postgresql://test:test@localhost:5432/test';
 process.env.JWT_SECRET ??= 'test-jwt-secret-at-least-16';
 
 const prismaMock = vi.hoisted(() => ({
-  product: { findFirst: vi.fn() },
-  purchaseClaim: { create: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() },
+  product: { findFirst: vi.fn(), delete: vi.fn(), update: vi.fn() },
+  purchaseClaim: { create: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn(), count: vi.fn() },
+  $transaction: vi.fn(async (ops: unknown[]) => Promise.all(ops)),
 }));
 vi.mock('../src/lib/prisma.js', () => ({ prisma: prismaMock }));
 
@@ -92,7 +93,7 @@ describe('merchantService.createQr', () => {
     const before = Date.now();
     const qr = await merchantService.createQr(TENANT, USER, { productId: PRODUCT, quantity: 3 });
 
-    expect(prismaMock.product.findFirst).toHaveBeenCalledWith({ where: { id: PRODUCT, tenantId: TENANT } });
+    expect(prismaMock.product.findFirst).toHaveBeenCalledWith({ where: { id: PRODUCT, tenantId: TENANT, deletedAt: null } });
     const data = prismaMock.purchaseClaim.create.mock.calls[0][0].data;
     expect(data).toMatchObject({ tenantId: TENANT, productId: PRODUCT, quantity: 3, points: 750, createdById: USER });
     expect(data.expiresAt.getTime() - before).toBeGreaterThanOrEqual(QR_TTL_MS - 1000);
@@ -165,5 +166,32 @@ describe('merchantService.voidQr', () => {
     prismaMock.purchaseClaim.updateMany.mockResolvedValue({ count: 0 });
     prismaMock.purchaseClaim.findFirst.mockResolvedValue(null);
     await expect(merchantService.voidQr(TENANT, CLAIM)).rejects.toMatchObject({ statusCode: 404 });
+  });
+});
+
+describe('merchantService.deleteProduct', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('borra de verdad una promo sin ventas', async () => {
+    prismaMock.product.findFirst.mockResolvedValue(product());
+    prismaMock.purchaseClaim.count.mockResolvedValue(0);
+    await expect(merchantService.deleteProduct(TENANT, PRODUCT)).resolves.toEqual({ ok: true, archived: false });
+    expect(prismaMock.product.delete).toHaveBeenCalledWith({ where: { id: PRODUCT } });
+    expect(prismaMock.product.update).not.toHaveBeenCalled();
+  });
+
+  it('archiva una promo con ventas (no rompe el historial) y anula sus QR pendientes', async () => {
+    prismaMock.product.findFirst.mockResolvedValue(product());
+    prismaMock.purchaseClaim.count.mockResolvedValue(2);
+    await expect(merchantService.deleteProduct(TENANT, PRODUCT)).resolves.toEqual({ ok: true, archived: true });
+    expect(prismaMock.product.delete).not.toHaveBeenCalled();
+    expect(prismaMock.product.update.mock.calls[0][0].data).toMatchObject({ isActive: false, deletedAt: expect.any(Date) });
+    expect(prismaMock.purchaseClaim.updateMany.mock.calls[0][0].where).toMatchObject({ productId: PRODUCT, claimedAt: null });
+  });
+
+  it('404 si la promo es de otro comercio o ya fue eliminada', async () => {
+    prismaMock.product.findFirst.mockResolvedValue(null);
+    await expect(merchantService.deleteProduct(TENANT, PRODUCT)).rejects.toMatchObject({ statusCode: 404 });
+    expect(prismaMock.product.findFirst.mock.calls[0][0].where).toMatchObject({ deletedAt: null });
   });
 });
