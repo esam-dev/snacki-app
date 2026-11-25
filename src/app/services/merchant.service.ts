@@ -76,8 +76,10 @@ export class MerchantService {
     return res.data.product;
   }
 
-  async deleteProduct(id: string): Promise<void> {
-    await firstValueFrom(this.http.delete(`${this.base}/products/${id}`));
+  /** `archived`: tenía historial (ventas/canjes), así que se archivó en vez de borrarse. */
+  async deleteProduct(id: string): Promise<{ archived: boolean }> {
+    const res = await firstValueFrom(this.http.delete<{ data: { ok: boolean; archived?: boolean } }>(`${this.base}/products/${id}`));
+    return { archived: !!res?.data?.archived };
   }
 
   // Rewards
@@ -96,8 +98,10 @@ export class MerchantService {
     return res.data.reward;
   }
 
-  async deleteReward(id: string): Promise<void> {
-    await firstValueFrom(this.http.delete(`${this.base}/rewards/${id}`));
+  /** `archived`: tenía historial (ventas/canjes), así que se archivó en vez de borrarse. */
+  async deleteReward(id: string): Promise<{ archived: boolean }> {
+    const res = await firstValueFrom(this.http.delete<{ data: { ok: boolean; archived?: boolean } }>(`${this.base}/rewards/${id}`));
+    return { archived: !!res?.data?.archived };
   }
 
   // QR de compra

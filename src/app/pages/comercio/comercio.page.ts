@@ -8,6 +8,11 @@ import { AuthService } from '../../services/auth.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { MerchantProduct, MerchantQr, MerchantQrStatus, MerchantReward, MerchantService, MerchantSettings } from '../../services/merchant.service';
 import QRCode from 'qrcode';
+import { addIcons } from 'ionicons';
+import { alertCircle, checkmarkCircle, close, informationCircle } from 'ionicons/icons';
+import { playSuccessChime } from '../../shared/sound/success-chime';
+
+type Aviso = 'ok' | 'error' | 'info';
 
 type ModalKind = 'promo' | 'reward' | 'settings' | 'map' | 'qr' | null;
 
@@ -50,6 +55,10 @@ export class ComercioPage {
   private alert = inject(AlertController);
   private cdr = inject(ChangeDetectorRef);
   private sanitizer = inject(DomSanitizer);
+
+  constructor() {
+    addIcons({ alertCircle, checkmarkCircle, close, informationCircle });
+  }
 
   /** URL del mapa embebido; se calcula al abrir el modal para no recrear el iframe en cada ciclo. */
   mapEmbedUrl: SafeResourceUrl | null = null;
@@ -213,7 +222,7 @@ export class ComercioPage {
       this.products = products;
       this.settings = settings;
     } catch (e: any) {
-      await this.mostrar(this.errorMsg(e) || 'No se pudieron cargar datos del comercio.');
+      await this.mostrarError(e, 'No se pudieron cargar datos del comercio.');
     } finally {
       this.loading = false;
       this.cdr.markForCheck();
@@ -261,7 +270,7 @@ export class ComercioPage {
   abrirMapa() {
     if (!this.tieneUbicacion) {
       this.abrirSettings();
-      this.mostrar('Agrega la ubicación de tu tienda para verla en el mapa.');
+      this.mostrar('Agrega la ubicación de tu tienda para verla en el mapa.', 'info');
       return;
     }
     const lat = Number(this.settings!.latitude);
@@ -302,7 +311,7 @@ export class ComercioPage {
   abrirQr(p?: MerchantProduct) {
     const activas = this.promosParaQr;
     if (!activas.length) {
-      this.mostrar('Necesitas una promo activa (vigente y sin pausar) para generar un QR.');
+      this.mostrar('Necesitas una promo activa (vigente y sin pausar) para generar un QR.', 'info');
       return;
     }
     const elegida = p && activas.some((a) => a.id === p.id) ? p : activas[0];
@@ -327,8 +336,9 @@ export class ComercioPage {
       this.qrStatus = 'pending';
       this.actualizarRestante();
       this.iniciarSeguimientoQr();
+      playSuccessChime();
     } catch (e: any) {
-      await this.mostrar(this.errorMsg(e) || 'No se pudo generar el QR.');
+      await this.mostrarError(e, 'No se pudo generar el QR.');
       // La promo pudo cambiar de estado (pausada / terminada): refresca la lista.
       if (e?.status === 409) await this.loadAll();
     } finally {
@@ -355,8 +365,9 @@ export class ComercioPage {
       this.qrStatus = 'expired';
       this.qrAnulado = true;
       this.detenerSeguimientoQr();
+      await this.mostrar('QR anulado correctamente. Ya nadie puede usarlo.', 'ok');
     } catch (e: any) {
-      await this.mostrar(this.errorMsg(e) || 'No se pudo anular el QR.');
+      await this.mostrarError(e, 'No se pudo anular el QR.');
       if (e?.status === 409) this.qrStatus = 'claimed';
     } finally {
       this.anulandoQr = false;
@@ -373,7 +384,7 @@ export class ComercioPage {
     try {
       const logo = await this.cargarImagen(QR_LOGO_SRC);
       const size = canvas.width * QR_LOGO_RATIO;
-      const plate = size * 1.22;
+      const plate = size * 1.12;
       const cx = canvas.width / 2;
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
@@ -412,8 +423,12 @@ export class ComercioPage {
     try {
       const { status } = await this.merchant.getQrStatus(claimId);
       if (this.qrResult?.claimId !== claimId) return; // se generó otro mientras tanto
+      const antes = this.qrStatus;
       this.qrStatus = status;
       if (status !== 'pending') this.detenerSeguimientoQr();
+      if (antes === 'pending' && status === 'claimed') {
+        await this.mostrar(`¡Listo! El cliente sumó ${this.qrResult?.points ?? 0} puntos.`, 'ok');
+      }
     } catch {
       // Sin red momentánea: se reintenta en el próximo ciclo.
     } finally {
@@ -501,9 +516,9 @@ export class ComercioPage {
       }
       this.modal = null;
       await this.loadAll();
-      await this.mostrar(editando ? 'Promo actualizada.' : 'Promo publicada.');
+      await this.mostrar(editando ? 'Promo actualizada correctamente.' : 'Promo publicada correctamente.', 'ok');
     } catch (e: any) {
-      await this.mostrar(this.errorMsg(e) || 'No se pudo guardar la promo.');
+      await this.mostrarError(e, 'No se pudo guardar la promo.');
     } finally {
       this.saving = false;
       this.cdr.markForCheck();
@@ -513,11 +528,11 @@ export class ComercioPage {
   async eliminarPromo(product: MerchantProduct) {
     if (!(await this.confirmar('Eliminar promo', `¿Seguro que quieres eliminar "${product.name}"?`))) return;
     try {
-      await this.merchant.deleteProduct(product.id);
+      const res = await this.merchant.deleteProduct(product.id);
       await this.loadAll();
-      await this.mostrar('Promo eliminada.');
+      await this.mostrar(res.archived ? 'Promo eliminada. Sus ventas anteriores quedan en el historial.' : 'Promo eliminada correctamente.', 'ok');
     } catch (e: any) {
-      await this.mostrar(this.errorMsg(e) || 'No se pudo eliminar la promo.');
+      await this.mostrarError(e, 'No se pudo eliminar la promo.');
     }
   }
 
@@ -546,9 +561,9 @@ export class ComercioPage {
       }
       this.modal = null;
       await this.loadAll();
-      await this.mostrar(editando ? 'Recompensa actualizada.' : 'Recompensa creada.');
+      await this.mostrar(editando ? 'Recompensa actualizada correctamente.' : 'Recompensa creada correctamente.', 'ok');
     } catch (e: any) {
-      await this.mostrar(this.errorMsg(e) || 'No se pudo guardar la recompensa.');
+      await this.mostrarError(e, 'No se pudo guardar la recompensa.');
     } finally {
       this.saving = false;
       this.cdr.markForCheck();
@@ -558,11 +573,11 @@ export class ComercioPage {
   async eliminarRecompensa(reward: MerchantReward) {
     if (!(await this.confirmar('Eliminar recompensa', `¿Seguro que quieres eliminar "${reward.name}"?`))) return;
     try {
-      await this.merchant.deleteReward(reward.id);
+      const res = await this.merchant.deleteReward(reward.id);
       await this.loadAll();
-      await this.mostrar('Recompensa eliminada.');
+      await this.mostrar(res.archived ? 'Recompensa eliminada. Sus canjes anteriores quedan en el historial.' : 'Recompensa eliminada correctamente.', 'ok');
     } catch (e: any) {
-      await this.mostrar(this.errorMsg(e) || 'No se pudo eliminar la recompensa.');
+      await this.mostrarError(e, 'No se pudo eliminar la recompensa.');
     }
   }
 
@@ -585,9 +600,9 @@ export class ComercioPage {
       });
       this.modal = null;
       await this.loadAll();
-      await this.mostrar('Configuración guardada.');
+      await this.mostrar('Configuración guardada correctamente.', 'ok');
     } catch (e: any) {
-      await this.mostrar(this.errorMsg(e) || 'No se pudo guardar la configuración.');
+      await this.mostrarError(e, 'No se pudo guardar la configuración.');
     } finally {
       this.saving = false;
       this.cdr.markForCheck();
@@ -730,13 +745,30 @@ export class ComercioPage {
     return role === 'destructive';
   }
 
-  private errorMsg(e: any): string | undefined {
+  /** Mensaje claro para un error de la API: sin conexión, fallo del servidor o el motivo que explica el backend. */
+  private async mostrarError(e: any, fallback: string) {
+    const status: number | undefined = e?.status;
     const err = e?.error?.error;
-    return err?.details?.[0]?.message || err?.message;
+    let msg: string;
+    if (status === 0) msg = 'Sin conexión con el servidor. Revisa tu internet e inténtalo de nuevo.';
+    else if (status === 401) msg = 'Tu sesión expiró. Vuelve a iniciar sesión.';
+    else if (!status || status >= 500) msg = `${fallback} Inténtalo de nuevo en unos segundos.`;
+    else msg = err?.details?.[0]?.message || err?.message || fallback;
+    await this.mostrar(msg, 'error');
   }
 
-  private async mostrar(message: string) {
-    const toast = await this.toast.create({ message, duration: 2600, position: 'top' });
+  /** Aviso arriba de la pantalla: verde con sonido si salió bien, rojo si falló, azul si es informativo. */
+  private async mostrar(message: string, tipo: Aviso = 'error') {
+    if (tipo === 'ok') playSuccessChime();
+    const icon = tipo === 'ok' ? 'checkmark-circle' : tipo === 'error' ? 'alert-circle' : 'information-circle';
+    const toast = await this.toast.create({
+      message,
+      icon,
+      duration: tipo === 'error' ? 4000 : 2600,
+      position: 'top',
+      cssClass: `snacki-toast snacki-toast-${tipo}`,
+      buttons: [{ icon: 'close', role: 'cancel', side: 'end' }],
+    });
     await toast.present();
   }
 }

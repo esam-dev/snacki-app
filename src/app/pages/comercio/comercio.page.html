@@ -407,7 +407,12 @@
     <ng-template>
       <ion-header>
         <ion-toolbar>
-          <ion-title>{{ qrResult ? 'Muestra este QR al cliente' : 'Generar QR de venta' }}</ion-title>
+          <ion-title>
+            <span class="modal-brand">
+              <img src="assets/icon/qr-logo.png" alt="" aria-hidden="true" />
+              {{ qrResult ? 'Muestra este QR al cliente' : 'Generar QR de venta' }}
+            </span>
+          </ion-title>
           <ion-buttons slot="end">
             <button class="icon-btn ghost" type="button" aria-label="Cerrar" (click)="cerrarModal()"><app-icon name="close" /></button>
           </ion-buttons>
@@ -464,7 +469,7 @@
             }
 
             @if (qrStatus === 'pending') {
-              <p class="qr-note">Sirve una sola vez · vence en {{ qrRestante }} ({{ qrResult.expiresAt | date:'dd/MM HH:mm' }}). Si el cliente no tiene señal, puede escanearlo igual y se confirmará al reconectarse.</p>
+              <p class="qr-note">Un solo uso · válido por {{ qrRestante }}</p>
               <button class="btn btn-text danger qr-void" type="button" [disabled]="anulandoQr" (click)="anularQr()">
                 <app-icon name="close" /> {{ anulandoQr ? 'Anulando...' : 'Anular QR (venta cancelada)' }}
               </button>

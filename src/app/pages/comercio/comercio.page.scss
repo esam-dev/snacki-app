@@ -110,6 +110,8 @@ $ring:0 0 0 3px rgba(27,116,228,.18);
 .dash-modal ion-toolbar{--background:#{$surface};--border-width:0 0 1px;--border-color:#{$divider};--min-height:56px;--padding-start:8px;--padding-end:8px}
 .dash-modal ion-title{font-size:16px;font-weight:700;color:$text}
 .dash-modal ion-header{box-shadow:none}
+.modal-brand{display:inline-flex;align-items:center;gap:8px}
+.modal-brand img{width:26px;height:26px;flex-shrink:0;mix-blend-mode:multiply}
 .dash-modal ion-header::after{display:none}
 .modal-body{--background:#{$surface};--padding-start:20px;--padding-end:20px;--padding-top:16px;--padding-bottom:24px}
 .modal-footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 20px calc(12px + var(--ion-safe-area-bottom,0px));background:$surface;border-top:1px solid $divider;box-shadow:none}
