@@ -1,4 +1,4 @@
-﻿import { TestBed } from '@angular/core/testing';
+import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -99,6 +99,30 @@ describe('AuthService (backend auth)', () => {
     const { auth, httpMock } = setup();
     await auth.restoreSession();
     httpMock.expectNone(`${environment.apiBaseUrl}/api/auth/me`);
+    expect(auth.currentUser).toBeNull();
+    expect(auth.authStatus()).toBe('anonymous');
+  });
+
+  it('login sin conexión devuelve un mensaje claro y no autentica', async () => {
+    const { auth, httpMock } = setup();
+    const promise = auth.login('ana@example.com', 'secreto123', 'cliente');
+
+    httpMock.expectOne(`${environment.apiBaseUrl}/api/auth/login`).error(new ProgressEvent('error'));
+
+    const result = await promise;
+    expect(result.success).toBe(false);
+    expect(result.code).toBe('NETWORK_ERROR');
+    expect(result.message).toContain('conectar');
+    expect(auth.currentUser).toBeNull();
+  });
+
+  it('cerrarSesion deja la sesión anónima aunque falle el almacenamiento del token', async () => {
+    const { auth, tokenStorage } = setup();
+    (auth as any).authStatus.set('authenticated');
+    vi.spyOn(tokenStorage, 'clear').mockRejectedValue(new Error('storage'));
+
+    await auth.cerrarSesion();
+
     expect(auth.currentUser).toBeNull();
     expect(auth.authStatus()).toBe('anonymous');
   });

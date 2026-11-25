@@ -1,11 +1,10 @@
-﻿import { Component, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { IonButton, IonCheckbox, IonContent, IonIcon, IonInput } from '@ionic/angular';
+import { IonButton, IonCheckbox, IonContent, IonIcon, IonInput, NavController } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { eyeOutline, eyeOffOutline } from 'ionicons/icons';
 import { SnackiHeaderComponent } from '../../shared/snacki-header/snacki-header.component';
 import { AuthService } from '../../services/auth.service';
-import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-perfil',
@@ -15,7 +14,7 @@ import { Router } from '@angular/router';
 })
 export class PerfilPage {
   private auth = inject(AuthService);
-  private router = inject(Router);
+  private nav = inject(NavController);
 
   nombre = this.auth.currentUser?.nombre ?? 'Usuario';
   correo = this.auth.currentUser?.correo ?? '';
@@ -37,6 +36,7 @@ export class PerfilPage {
 
   async cerrarSesion() {
     await this.auth.cerrarSesion();
-    this.router.navigateByUrl('/login');
+    // navigateRoot vacía la pila de Ionic (tabs incluidas) y deja el login como única pantalla.
+    await this.nav.navigateRoot('/login', { replaceUrl: true });
   }
 }

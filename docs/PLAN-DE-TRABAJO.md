@@ -26,11 +26,13 @@ Roles:
 ## 2. Estado actual
 | Hecho | Falta |
 |---|---|
-| Pantallas Ionic (login, registro, home, explorar, tienda, QR, puntos, perfil, comercio) | Conectar puntos/catálogo/canje del cliente al backend (hoy simulados en `localStorage` / `store.service.ts`) |
-| Auth contra backend (`/auth/*`, `/tenants`, JWT + interceptor) | QR firmado generado por el comercio + `POST /api/claims` |
+| Pantallas Ionic (login, registro, home, explorar, tienda, QR, puntos, perfil, comercio) | Conectar puntos/canje del cliente al backend (hoy simulados en `localStorage` / `store.service.ts`); el catálogo ya viene del backend |
+| Auth contra backend (`/auth/*`, `/tenants`, JWT + interceptor) | Integrar `POST /api/claims` en la app del cliente |
 | Esquema Prisma + seed de comercios gastronómicos (`feat/db-schema-seed`, PR #6) | Modelo `Referral` + reglas de bono en `Tenant` (`feat/referrals-engine`) |
-| API comercio: promos, recompensas y settings + panel comercio responsive con mapa del local (`feat/merchant-catalog`, PR #7) | Wallet, canjes, stats, referidos, comercios cercanos para el cliente |
-| Escáner QR (`@capacitor-mlkit/barcode-scanning`); `@capacitor-community/sqlite` instalado sin usar | SQLite offline + sincronización, push, deploy Railway, build Android, pulido UX, informe |
+| API comercio: promos, recompensas (con foto) y settings + panel comercio responsive con mapa del local (`feat/merchant-catalog`, PR #7) | Wallet, canjes, stats, referidos, comercios cercanos para el cliente |
+| Catálogo del cliente desde la API: `/catalog/*` (promos vigentes, recompensas, logo e imágenes; se refresca al entrar, al volver a la app y cada 60 s) (PR #10) | SQLite offline + sincronización, mapa, push, deploy Railway, build Android, pulido UX, informe |
+| QR firmado generado por el comercio + `POST /api/claims` atómico, una vez por QR (`feat/merchant-qr`) | |
+| Escáner QR (`@capacitor-mlkit/barcode-scanning`); `@capacitor-community/sqlite` instalado sin usar | |
 
 ## 3. Arquitectura
 ```
@@ -86,8 +88,8 @@ Sincronización (`SyncService`):
 
 ## 6. API
 **Comercio** (rol `comercio`, solo su tenant)
-- `GET/POST/PATCH/DELETE /api/merchant/products` (hecho)
-- `GET/POST/PATCH/DELETE /api/merchant/rewards` (hecho)
+- `GET/POST/PATCH/DELETE /api/merchant/products` (acepta `imageUrl`: foto PNG/JPG/WebP como data URL, URL o ruta de assets; si la promo ya tiene ventas se archiva en vez de borrarse) (hecho)
+- `GET/POST/PATCH/DELETE /api/merchant/rewards` (igual, con `imageUrl`; se archiva si ya tiene canjes) (hecho)
 - `PATCH /api/merchant/settings` (`pointsExpireAt`, dirección, lat/lng, categoría, logo, **reglas de referidos**) (hecho: base; pendiente: referidos)
 - `POST /api/merchant/qr` `{productId, quantity}` → `{claimId, token, qrContent, expiresAt, points}` (token compacto `S1.<claimId>.<exp>.<HMAC-SHA256>` firmado con `QR_SECRET`; el QR codifica `snacki://claim/<token>` con el logo de Snacki al centro) (hecho)
 - `GET /api/merchant/qr/:id` → `pending | claimed | expired` (la pantalla del QR muestra "escaneado") (hecho)
@@ -97,6 +99,8 @@ Sincronización (`SyncService`):
 - `POST /api/merchant/notifications` `{title, body, productId?}` → push a sus clientes · `GET` historial
 
 **Cliente**
+- `GET /api/catalog/tenants` ✅ (comercios activos con promos vigentes y recompensas activas; requiere sesión)
+- `GET /api/catalog/images/:kind/:id` ✅ (`kind` = `tenant|product|reward`; sirve las fotos subidas por el comercio, pública y cacheable)
 - `GET /api/promos?category=&lat=&lng=` (promos vigentes, "lo nuevo")
 - `GET /api/tenants/nearby?lat=&lng=&radiusKm=` (comercios adheridos con distancia)
 - `GET /api/tenants/:slug` (promos vigentes + recompensas + si tiene referidos activos)

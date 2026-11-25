@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, effect, inject, untracked } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AlertController, IonButton, IonContent, ToastController } from '@ionic/angular';
@@ -22,12 +22,21 @@ export class TiendaPage implements OnInit {
   local?: Local = this.stores.getById(this.route.snapshot.paramMap.get('id'));
   canjeando = false;
 
+  constructor() {
+    // Repinta la tienda cuando el comercio cambia sus promos o recompensas.
+    effect(() => {
+      this.stores.catalogoVersion();
+      untracked(() => this.cargarLocal());
+    });
+  }
+
   ngOnInit() {
     this.cargarLocal();
   }
 
   ionViewWillEnter() {
     this.cargarLocal();
+    void this.stores.refrescarCatalogo(3000);
   }
 
   private cargarLocal() {

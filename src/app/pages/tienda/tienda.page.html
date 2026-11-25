@@ -12,9 +12,25 @@
       <ion-button class="snacki-btn small" (click)="mostrarQr()">Escanear compra</ion-button>
     </section>
 
-    @if (local.productos.length) {
+    @if (local.promos.length) {
+      <h2 class="section-title">Promos vigentes</h2>
       <div class="item-grid">
-        @for (p of local.productos; track p.nombre) {
+        @for (promo of local.promos; track promo.id) {
+          <article class="item-card">
+            <div class="media"><img [src]="promo.imagen" [alt]="promo.nombre" /></div>
+            <div class="info">
+              <div class="name">{{ promo.nombre }}</div>
+              <div class="pts">+{{ promo.puntos | number }} PTS</div>
+            </div>
+          </article>
+        }
+      </div>
+    }
+
+    @if (local.productos.length) {
+      <h2 class="section-title">Recompensas</h2>
+      <div class="item-grid">
+        @for (p of local.productos; track p.id ?? p.nombre) {
           <article class="item-card">
             <div class="media"><img [src]="p.imagen" [alt]="p.nombre" /></div>
             <div class="info">
@@ -26,7 +42,7 @@
         }
       </div>
     } @else {
-      <p class="empty">Este local aún no tiene ofertas disponibles.</p>
+      <p class="empty">Este local aún no tiene recompensas disponibles.</p>
     }
   }
 </ion-content>

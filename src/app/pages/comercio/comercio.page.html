@@ -136,7 +136,11 @@
           <ul class="row-list">
             @for (p of promosVisibles; track p.id) {
               <li class="row">
-                <img class="row-thumb" [src]="p.imageUrl || 'assets/img/prod-combo-bacon.jpg'" [alt]="p.name" />
+                @if (p.imageUrl) {
+                  <img class="row-thumb" [src]="p.imageUrl" [alt]="p.name" />
+                } @else {
+                  <span class="row-thumb row-thumb-empty" aria-hidden="true"><app-icon name="image" /></span>
+                }
                 <div class="row-info">
                   <strong class="row-title">{{ p.name }}</strong>
                   <span class="row-meta">{{ p.points | number }} pts · {{ p.promoStartsAt | date:'dd/MM' }} – {{ p.promoEndsAt | date:'dd/MM/yyyy' }}</span>
@@ -184,7 +188,11 @@
           <ul class="row-list">
             @for (r of recompensasVisibles; track r.id) {
               <li class="row">
-                <img class="row-thumb" [src]="r.imageUrl || 'assets/img/prod-combo-bacon.jpg'" [alt]="r.name" />
+                @if (r.imageUrl) {
+                  <img class="row-thumb" [src]="r.imageUrl" [alt]="r.name" />
+                } @else {
+                  <span class="row-thumb row-thumb-empty" aria-hidden="true"><app-icon name="image" /></span>
+                }
                 <div class="row-info">
                   <strong class="row-title">{{ r.name }}</strong>
                   <span class="row-meta">{{ r.cost | number }} pts</span>
@@ -218,14 +226,14 @@
  </div>
 
   <!-- Selector de imagen compartido por los modales de promo y recompensa -->
-  <ng-template #imagePicker>
+  <ng-template #imagePicker let-destino>
     <label class="field-label">Imagen del producto</label>
     <div class="image-picker">
-      <button class="image-preview" type="button" [disabled]="procesandoImagen" [attr.aria-label]="itemImageUrl ? 'Cambiar imagen' : 'Subir imagen'" (click)="imageInput.click()">
-        @if (procesandoImagen) {
+      <button class="image-preview" type="button" [disabled]="procesandoFoto(destino)" [attr.aria-label]="fotoDe(destino) ? 'Cambiar imagen' : 'Subir imagen'" (click)="imageInput.click()">
+        @if (procesandoFoto(destino)) {
           <ion-spinner name="crescent"></ion-spinner>
-        } @else if (itemImageUrl) {
-          <img [src]="itemImageUrl" alt="Vista previa de la imagen" />
+        } @else if (fotoDe(destino)) {
+          <img [src]="fotoDe(destino)" alt="Vista previa de la imagen" />
         } @else {
           <span class="image-empty">
             <app-icon name="image-plus" />
@@ -233,17 +241,17 @@
           </span>
         }
       </button>
-      <input #imageInput class="logo-file" type="file" accept="image/png,image/jpeg" (change)="onItemImageSelected($event)" />
+      <input #imageInput class="logo-file" type="file" accept="image/png,image/jpeg,image/webp" (change)="onFotoSeleccionada($event, destino)" />
       <div class="logo-actions">
-        <button class="btn btn-secondary" type="button" [disabled]="procesandoImagen" (click)="imageInput.click()">
-          <app-icon name="upload" /> {{ itemImageUrl ? 'Cambiar imagen' : 'Subir imagen' }}
+        <button class="btn btn-secondary" type="button" [disabled]="procesandoFoto(destino)" (click)="imageInput.click()">
+          <app-icon name="upload" /> {{ fotoDe(destino) ? 'Cambiar imagen' : 'Subir imagen' }}
         </button>
-        @if (itemImageUrl) {
-          <button class="btn btn-text danger" type="button" (click)="quitarImagen()">
+        @if (fotoDe(destino)) {
+          <button class="btn btn-text danger" type="button" (click)="quitarFoto(destino)">
             <app-icon name="trash" /> Quitar
           </button>
         }
-        <span class="field-hint">PNG o JPG · máx. 5 MB · se ajusta a 800 px</span>
+        <span class="field-hint">PNG, JPG o WebP · máx. 15 MB · se ajusta a 800 px</span>
       </div>
     </div>
   </ng-template>
@@ -262,7 +270,7 @@
       <ion-content class="modal-body">
         <label class="field-label">Nombre *</label>
         <input class="field-input" type="text" [(ngModel)]="nombrePromo" placeholder="Ej. Café nuevo" maxlength="120" />
-        <ng-container *ngTemplateOutlet="imagePicker"></ng-container>
+        <ng-container *ngTemplateOutlet="imagePicker; context: { $implicit: 'promo' }"></ng-container>
         <label class="field-label">Descripción</label>
         <textarea class="field-textarea" [(ngModel)]="descripcionPromo" placeholder="Opcional" maxlength="500"></textarea>
         <label class="field-label">Puntos *</label>
@@ -285,7 +293,7 @@
       </ion-content>
       <ion-footer class="modal-footer">
         <button class="btn btn-secondary" type="button" (click)="cerrarModal()">Cancelar</button>
-        <button class="btn btn-primary" type="button" [disabled]="saving || procesandoImagen" (click)="guardarPromo()">
+        <button class="btn btn-primary" type="button" [disabled]="saving || procesandoImagenPromo" (click)="guardarPromo()">
           {{ saving ? 'Guardando...' : (editingPromoId ? 'Guardar cambios' : 'Publicar promo') }}
         </button>
       </ion-footer>
@@ -306,7 +314,7 @@
       <ion-content class="modal-body">
         <label class="field-label">Nombre *</label>
         <input class="field-input" type="text" [(ngModel)]="nombreRecompensa" placeholder="Ej. Café gratis" maxlength="120" />
-        <ng-container *ngTemplateOutlet="imagePicker"></ng-container>
+        <ng-container *ngTemplateOutlet="imagePicker; context: { $implicit: 'reward' }"></ng-container>
         <label class="field-label">Descripción</label>
         <textarea class="field-textarea" [(ngModel)]="descripcionRecompensa" placeholder="Opcional" maxlength="500"></textarea>
         <label class="field-label">Costo en puntos *</label>
@@ -314,7 +322,7 @@
       </ion-content>
       <ion-footer class="modal-footer">
         <button class="btn btn-secondary" type="button" (click)="cerrarModal()">Cancelar</button>
-        <button class="btn btn-primary" type="button" [disabled]="saving || procesandoImagen" (click)="guardarRecompensa()">
+        <button class="btn btn-primary" type="button" [disabled]="saving || procesandoImagenRecompensa" (click)="guardarRecompensa()">
           {{ saving ? 'Guardando...' : (editingRewardId ? 'Guardar cambios' : 'Crear recompensa') }}
         </button>
       </ion-footer>

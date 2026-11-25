@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, effect, inject, untracked } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { IonContent, IonIcon } from '@ionic/angular';
 import { addIcons } from 'ionicons';
@@ -22,6 +22,10 @@ export class PuntosPage implements OnInit {
 
   constructor() {
     addIcons({ cardOutline });
+    effect(() => {
+      this.stores.catalogoVersion();
+      untracked(() => this.cargarDatos());
+    });
   }
 
   ngOnInit() {
@@ -30,6 +34,7 @@ export class PuntosPage implements OnInit {
 
   ionViewWillEnter() {
     this.cargarDatos();
+    void this.stores.refrescarCatalogo(3000);
   }
 
   private cargarDatos() {

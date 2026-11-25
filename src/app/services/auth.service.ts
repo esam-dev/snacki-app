@@ -1,6 +1,6 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { TimeoutError, firstValueFrom, timeout } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { ApiResponse, AuthSessionData, LoginPayload, MeSessionData, RegisterPayload, SessionUser, UserRole } from '../models/auth.models';
 import { TokenStorageService } from './token-storage.service';
@@ -8,6 +8,9 @@ import { TokenStorageService } from './token-storage.service';
 export type TipoCuenta = UserRole;
 export type SnackiUser = SessionUser;
 export interface AuthActionResult { success: boolean; message?: string; code?: string; }
+
+/** Si el servidor no responde, el intento se da por fallido y la pantalla vuelve al formulario. */
+const AUTH_REQUEST_TIMEOUT_MS = 15_000;
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -51,7 +54,7 @@ export class AuthService {
     const payload: LoginPayload = { identifier: identifier.trim(), password, accountType };
     if (!payload.identifier || !payload.password.trim()) return { success: false, message: 'Completa tu usuario/correo y contraseña.' };
     try {
-      const res = await firstValueFrom(this.http.post<ApiResponse<AuthSessionData>>(`${environment.apiBaseUrl}/api/auth/login`, payload));
+      const res = await firstValueFrom(this.http.post<ApiResponse<AuthSessionData>>(`${environment.apiBaseUrl}/api/auth/login`, payload).pipe(timeout(AUTH_REQUEST_TIMEOUT_MS)));
       await this.applySession(res.data);
       return { success: true };
     } catch (err) { return this.mapError(err, 'No se pudo iniciar sesión.'); }
@@ -62,14 +65,19 @@ export class AuthService {
     if (!payload.fullName || !payload.email || !payload.password.trim()) return { success: false, message: 'Completa todos los campos obligatorios.' };
     if (tipo === 'comercio' && !payload.tenantId) return { success: false, message: 'Selecciona el comercio asociado.' };
     try {
-      const res = await firstValueFrom(this.http.post<ApiResponse<AuthSessionData>>(`${environment.apiBaseUrl}/api/auth/register`, payload));
+      const res = await firstValueFrom(this.http.post<ApiResponse<AuthSessionData>>(`${environment.apiBaseUrl}/api/auth/register`, payload).pipe(timeout(AUTH_REQUEST_TIMEOUT_MS)));
       await this.applySession(res.data);
       return { success: true };
     } catch (err) { return this.mapError(err, 'No se pudo crear la cuenta.'); }
   }
 
   async cerrarSesion() { await this.logout(); }
-  async logout() { await this.tokenStorage.clear(); this.clearSession(); }
+  async logout() {
+    // El estado en memoria se limpia primero: un fallo del almacenamiento no debe impedir cerrar sesión.
+    this.clearSession();
+    this.restorePromise = null;
+    try { await this.tokenStorage.clear(); } catch { /* la sesión en memoria ya quedó anónima; el guard no deja pasar sin usuario */ }
+  }
 
   private async applySession(data: AuthSessionData) {
     await this.tokenStorage.setToken(data.auth.accessToken);
@@ -91,7 +99,10 @@ export class AuthService {
   }
 
   private mapError(err: unknown, fallback: string): AuthActionResult {
+    const sinConexion = 'No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.';
+    if (err instanceof TimeoutError) return { success: false, code: 'TIMEOUT', message: sinConexion };
     if (!(err instanceof HttpErrorResponse)) return { success: false, message: fallback };
+    if (err.status === 0) return { success: false, code: 'NETWORK_ERROR', message: sinConexion };
     const api = err.error?.error;
     const code = api?.code as string | undefined;
     const message = (api?.message as string | undefined) || fallback;
@@ -100,6 +111,6 @@ export class AuthService {
     if (err.status === 409) return { success: false, code: code || 'CONFLICT', message: message || 'El correo ya está registrado.' };
     if (err.status === 400) return { success: false, code: code || 'VALIDATION_ERROR', message: message || 'Datos inválidos.' };
     if (err.status === 404) return { success: false, code: code || 'NOT_FOUND', message: message || 'Recurso no encontrado.' };
-    return { success: false, code, message };
+    return { success: false, code, message: err.status >= 500 ? 'El servidor no pudo procesar la solicitud. Inténtalo más tarde.' : message };
   }
 }
