@@ -27,7 +27,7 @@ export const catalogService = {
         id: true, slug: true, name: true, category: true, address: true,
         latitude: true, longitude: true, logoUrl: true, pointsExpireAt: true, updatedAt: true,
         products: {
-          where: { isActive: true, promoStartsAt: { lte: now }, promoEndsAt: { gte: now } },
+          where: { isActive: true, deletedAt: null, promoStartsAt: { lte: now }, promoEndsAt: { gte: now } },
           orderBy: { promoEndsAt: 'asc' },
           select: {
             id: true, name: true, description: true, points: true, imageUrl: true,
@@ -35,7 +35,7 @@ export const catalogService = {
           },
         },
         rewards: {
-          where: { isActive: true },
+          where: { isActive: true, deletedAt: null },
           orderBy: { cost: 'asc' },
           select: { id: true, name: true, description: true, cost: true, imageUrl: true, updatedAt: true },
         },

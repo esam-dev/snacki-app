@@ -60,6 +60,14 @@ export const updateMerchantSettingsSchema = z.object({
   pointsExpireAt: z.string().datetime().optional().nullable(),
 });
 
+export const QR_MAX_QUANTITY = 20;
+
+export const createQrSchema = z.object({
+  productId: z.string().uuid('Promo inválida'),
+  quantity: z.number().int().min(1).max(QR_MAX_QUANTITY).default(1),
+});
+
+export type CreateQrInput = z.infer<typeof createQrSchema>;
 export type CreateProductInput = z.infer<typeof createProductSchema>;
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;
 export type CreateRewardInput = z.infer<typeof createRewardSchema>;

@@ -6,8 +6,11 @@ import {
   createRewardSchema,
   updateRewardSchema,
   updateMerchantSettingsSchema,
+  createQrSchema,
 } from './merchant.schemas.js';
 import { merchantService } from './merchant.service.js';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function merchantRoutes(app: FastifyInstance) {
   // All merchant routes require auth + comercio role
@@ -58,6 +61,25 @@ export async function merchantRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     const result = await merchantService.deleteReward(request.authUser?.tenantId, id);
     return reply.send({ data: result });
+  });
+
+  // QR de compra
+  app.post('/qr', async (request, reply) => {
+    const qr = await merchantService.createQr(request.authUser?.tenantId, request.authUser?.sub, createQrSchema.parse(request.body));
+    return reply.status(201).send({ data: qr });
+  });
+
+  app.get('/qr/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!UUID_RE.test(id)) return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'QR no encontrado' } });
+    const status = await merchantService.getQrStatus(request.authUser?.tenantId, id);
+    return reply.send({ data: status });
+  });
+
+  app.post('/qr/:id/void', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!UUID_RE.test(id)) return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'QR no encontrado' } });
+    return reply.send({ data: await merchantService.voidQr(request.authUser?.tenantId, id) });
   });
 
   // Settings

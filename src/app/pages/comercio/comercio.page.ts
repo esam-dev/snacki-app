@@ -1,39 +1,28 @@
 import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { AlertController, IonButtons, IonContent, IonFooter, IonHeader, IonIcon, IonModal, IonSpinner, IonTitle, IonToolbar, NavController, ToastController } from '@ionic/angular';
-import { addIcons } from 'ionicons';
-import {
-  addOutline,
-  calendarOutline,
-  checkmarkCircle,
-  chevronForwardOutline,
-  closeOutline,
-  createOutline,
-  ellipseOutline,
-  giftOutline,
-  gridOutline,
-  imageOutline,
-  locationOutline,
-  logOutOutline,
-  mapOutline,
-  openOutline,
-  navigateOutline,
-  pricetagsOutline,
-  refreshOutline,
-  rocketOutline,
-  settingsOutline,
-  statsChartOutline,
-  storefrontOutline,
-  timeOutline,
-  trashOutline,
-  cloudUploadOutline,
-} from 'ionicons/icons';
+import { AlertController, IonButtons, IonContent, IonFooter, IonHeader, IonModal, IonSpinner, IonTitle, IonToolbar, NavController, ToastController } from '@ionic/angular';
 import { AuthService } from '../../services/auth.service';
-import { MerchantProduct, MerchantReward, MerchantService, MerchantSettings } from '../../services/merchant.service';
+import { IconComponent } from '../../shared/icon/icon.component';
+import { MerchantProduct, MerchantQr, MerchantQrStatus, MerchantReward, MerchantService, MerchantSettings } from '../../services/merchant.service';
+import QRCode from 'qrcode';
+import { addIcons } from 'ionicons';
+import { alertCircle, checkmarkCircle, close, informationCircle } from 'ionicons/icons';
+import { playSuccessChime } from '../../shared/sound/success-chime';
 
-type ModalKind = 'promo' | 'reward' | 'settings' | 'map' | null;
+type Aviso = 'ok' | 'error' | 'info';
+
+type ModalKind = 'promo' | 'reward' | 'settings' | 'map' | 'qr' | null;
+
+/** Unidades máximas por QR (igual que el backend). */
+const QR_MAX_CANTIDAD = 20;
+/** Cada cuánto se consulta si el cliente ya escaneó el QR mostrado. */
+const QR_POLL_MS = 4000;
+/** Logo de Snacki al centro del QR (corrección de errores H tolera ~30 % de área tapada; usamos ~5 %). */
+const QR_LOGO_SRC = 'assets/icon/qr-logo.png';
+const QR_SIZE = 640;
+const QR_LOGO_RATIO = 0.2;
 type Section = 'inicio' | 'promos' | 'recompensas';
 type PromoStatus = 'activa' | 'programada' | 'finalizada' | 'pausada';
 
@@ -64,7 +53,7 @@ export const CATEGORIAS = [
   selector: 'app-comercio',
   templateUrl: './comercio.page.html',
   styleUrls: ['./comercio.page.scss'],
-  imports: [IonContent, IonFooter, IonHeader, IonToolbar, IonTitle, IonButtons, IonIcon, IonModal, IonSpinner, FormsModule, DecimalPipe, DatePipe],
+  imports: [IonContent, IonFooter, IonHeader, IonToolbar, IonTitle, IonButtons, IonModal, IonSpinner, FormsModule, DecimalPipe, DatePipe, NgTemplateOutlet, IconComponent],
 })
 export class ComercioPage {
   private auth = inject(AuthService);
@@ -74,6 +63,10 @@ export class ComercioPage {
   private alert = inject(AlertController);
   private cdr = inject(ChangeDetectorRef);
   private sanitizer = inject(DomSanitizer);
+
+  constructor() {
+    addIcons({ alertCircle, checkmarkCircle, close, informationCircle });
+  }
 
   /** URL del mapa embebido; se calcula al abrir el modal para no recrear el iframe en cada ciclo. */
   mapEmbedUrl: SafeResourceUrl | null = null;
@@ -121,33 +114,29 @@ export class ComercioPage {
   settingsPointsExpireAt = '';
   procesandoLogo = false;
 
-  constructor() {
-    addIcons({
-      addOutline,
-      calendarOutline,
-      checkmarkCircle,
-      chevronForwardOutline,
-      closeOutline,
-      createOutline,
-      ellipseOutline,
-      giftOutline,
-      gridOutline,
-      imageOutline,
-      locationOutline,
-      logOutOutline,
-      mapOutline,
-      openOutline,
-      navigateOutline,
-      pricetagsOutline,
-      refreshOutline,
-      rocketOutline,
-      settingsOutline,
-      statsChartOutline,
-      storefrontOutline,
-      timeOutline,
-      trashOutline,
-      cloudUploadOutline,
-    });
+  // QR de compra
+  readonly qrMaxCantidad = QR_MAX_CANTIDAD;
+  qrProductId = '';
+  qrCantidad = 1;
+  qrResult: MerchantQr | null = null;
+  qrImage = '';
+  qrStatus: MerchantQrStatus = 'pending';
+  qrRestante = '';
+  generandoQr = false;
+  anulandoQr = false;
+  qrAnulado = false;
+  private qrTimer: ReturnType<typeof setInterval> | null = null;
+
+  get promosParaQr(): MerchantProduct[] {
+    return this.products.filter((p) => this.promoStatus(p) === 'activa');
+  }
+
+  get qrProducto(): MerchantProduct | undefined {
+    return this.products.find((p) => p.id === this.qrProductId);
+  }
+
+  get qrPuntosTotales(): number {
+    return (this.qrProducto?.points ?? 0) * this.qrCantidad;
   }
 
   get comercioNombre(): string {
@@ -241,7 +230,7 @@ export class ComercioPage {
       this.products = products;
       this.settings = settings;
     } catch (e: any) {
-      await this.mostrar(this.errorMsg(e) || 'No se pudieron cargar datos del comercio.');
+      await this.mostrarError(e, 'No se pudieron cargar datos del comercio.');
     } finally {
       this.loading = false;
       this.cdr.markForCheck();
@@ -291,7 +280,7 @@ export class ComercioPage {
   abrirMapa() {
     if (!this.tieneUbicacion) {
       this.abrirSettings();
-      this.mostrar('Agrega la ubicación de tu tienda para verla en el mapa.');
+      this.mostrar('Agrega la ubicación de tu tienda para verla en el mapa.', 'info');
       return;
     }
     const lat = Number(this.settings!.latitude);
@@ -326,8 +315,171 @@ export class ComercioPage {
     this.modal = null;
   }
 
+  // ---------- QR de compra ----------
+
+  /** Abre el generador de QR; si viene una promo, queda preseleccionada. */
+  abrirQr(p?: MerchantProduct) {
+    const activas = this.promosParaQr;
+    if (!activas.length) {
+      this.mostrar('Necesitas una promo activa (vigente y sin pausar) para generar un QR.', 'info');
+      return;
+    }
+    const elegida = p && activas.some((a) => a.id === p.id) ? p : activas[0];
+    this.qrProductId = elegida.id;
+    this.qrCantidad = 1;
+    this.limpiarQr();
+    this.modal = 'qr';
+  }
+
+  cambiarCantidadQr(delta: number) {
+    this.qrCantidad = Math.min(QR_MAX_CANTIDAD, Math.max(1, this.qrCantidad + delta));
+  }
+
+  async generarQr() {
+    if (this.generandoQr || !this.qrProductId) return;
+    this.generandoQr = true;
+    this.cdr.markForCheck();
+    try {
+      const qr = await this.merchant.createQr(this.qrProductId, this.qrCantidad);
+      this.qrImage = await this.dibujarQrConLogo(qr.qrContent);
+      this.qrResult = qr;
+      this.qrStatus = 'pending';
+      this.actualizarRestante();
+      this.iniciarSeguimientoQr();
+      playSuccessChime();
+    } catch (e: any) {
+      await this.mostrarError(e, 'No se pudo generar el QR.');
+      // La promo pudo cambiar de estado (pausada / terminada): refresca la lista.
+      if (e?.status === 409) await this.loadAll();
+    } finally {
+      this.generandoQr = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  /** Vuelve al formulario para emitir otro QR (la venta anterior sigue válida si no se escaneó). */
+  nuevoQr() {
+    this.limpiarQr();
+  }
+
+  /** Invalida el QR mostrado (venta cancelada o generado por error) para que nadie pueda usarlo. */
+  async anularQr() {
+    const claimId = this.qrResult?.claimId;
+    if (!claimId || this.anulandoQr || this.qrStatus !== 'pending') return;
+    const ok = await this.confirmar('Anular QR', 'El cliente ya no podrá sumar puntos con este código. ¿Continuar?', 'Anular');
+    if (!ok || this.qrResult?.claimId !== claimId) return;
+    this.anulandoQr = true;
+    this.cdr.markForCheck();
+    try {
+      await this.merchant.voidQr(claimId);
+      this.qrStatus = 'expired';
+      this.qrAnulado = true;
+      this.detenerSeguimientoQr();
+      await this.mostrar('QR anulado correctamente. Ya nadie puede usarlo.', 'ok');
+    } catch (e: any) {
+      await this.mostrarError(e, 'No se pudo anular el QR.');
+      if (e?.status === 409) this.qrStatus = 'claimed';
+    } finally {
+      this.anulandoQr = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  /** Dibuja el QR (corrección H) y pone el logo de Snacki sobre una placa blanca al centro. */
+  private async dibujarQrConLogo(content: string): Promise<string> {
+    const canvas = document.createElement('canvas');
+    await QRCode.toCanvas(canvas, content, { errorCorrectionLevel: 'H', margin: 1, width: QR_SIZE });
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return canvas.toDataURL('image/png');
+    try {
+      const logo = await this.cargarImagen(QR_LOGO_SRC);
+      const size = canvas.width * QR_LOGO_RATIO;
+      const plate = size * 1.12;
+      const cx = canvas.width / 2;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.roundRect(cx - plate / 2, cx - plate / 2, plate, plate, plate * 0.24);
+      ctx.fill();
+      ctx.drawImage(logo, cx - size / 2, cx - size / 2, size, size);
+    } catch {
+      // Sin logo el QR sigue siendo válido.
+    }
+    return canvas.toDataURL('image/png');
+  }
+
+  private cargarImagen(src: string): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('logo'));
+      img.src = src;
+    });
+  }
+
+  private iniciarSeguimientoQr() {
+    this.detenerSeguimientoQr();
+    this.qrTimer = setInterval(() => this.consultarEstadoQr(), QR_POLL_MS);
+  }
+
+  private detenerSeguimientoQr() {
+    if (this.qrTimer) clearInterval(this.qrTimer);
+    this.qrTimer = null;
+  }
+
+  private async consultarEstadoQr() {
+    const claimId = this.qrResult?.claimId;
+    if (!claimId) return;
+    this.actualizarRestante();
+    try {
+      const { status } = await this.merchant.getQrStatus(claimId);
+      if (this.qrResult?.claimId !== claimId) return; // se generó otro mientras tanto
+      const antes = this.qrStatus;
+      this.qrStatus = status;
+      if (status !== 'pending') this.detenerSeguimientoQr();
+      if (antes === 'pending' && status === 'claimed') {
+        await this.mostrar(`¡Listo! El cliente sumó ${this.qrResult?.points ?? 0} puntos.`, 'ok');
+      }
+    } catch {
+      // Sin red momentánea: se reintenta en el próximo ciclo.
+    } finally {
+      this.cdr.markForCheck();
+    }
+  }
+
+  private actualizarRestante() {
+    if (!this.qrResult) return;
+    const ms = new Date(this.qrResult.expiresAt).getTime() - Date.now();
+    if (ms <= 0) {
+      this.qrStatus = 'expired';
+      this.qrRestante = '';
+      this.detenerSeguimientoQr();
+      return;
+    }
+    const h = Math.floor(ms / 3_600_000);
+    const m = Math.floor((ms % 3_600_000) / 60_000);
+    this.qrRestante = h > 0 ? `${h} h ${m} min` : `${Math.max(1, m)} min`;
+  }
+
+  private limpiarQr() {
+    this.detenerSeguimientoQr();
+    this.qrResult = null;
+    this.qrImage = '';
+    this.qrStatus = 'pending';
+    this.qrRestante = '';
+    this.qrAnulado = false;
+  }
+
+  ionViewWillLeave() {
+    this.detenerSeguimientoQr();
+  }
+
+  ngOnDestroy() {
+    this.detenerSeguimientoQr();
+  }
+
   /** Cada modal solo se cierra a sí mismo: evita que un didDismiss tardío cierre el modal siguiente. */
   onModalDismiss(kind: Exclude<ModalKind, null>) {
+    if (kind === 'qr') this.limpiarQr();
     if (this.modal === kind) this.modal = null;
     if (kind === 'map' && this.abrirSettingsTrasMapa) {
       this.abrirSettingsTrasMapa = false;
@@ -377,9 +529,9 @@ export class ComercioPage {
       }
       this.modal = null;
       await this.loadAll();
-      await this.mostrar(editando ? 'Promo actualizada.' : 'Promo publicada.');
+      await this.mostrar(editando ? 'Promo actualizada correctamente.' : 'Promo publicada correctamente.', 'ok');
     } catch (e: any) {
-      await this.mostrar(this.errorMsg(e) || 'No se pudo guardar la promo.');
+      await this.mostrarError(e, 'No se pudo guardar la promo.');
     } finally {
       this.saving = false;
       this.cdr.markForCheck();
@@ -389,11 +541,11 @@ export class ComercioPage {
   async eliminarPromo(product: MerchantProduct) {
     if (!(await this.confirmar('Eliminar promo', `¿Seguro que quieres eliminar "${product.name}"?`))) return;
     try {
-      await this.merchant.deleteProduct(product.id);
+      const res = await this.merchant.deleteProduct(product.id);
       await this.loadAll();
-      await this.mostrar('Promo eliminada.');
+      await this.mostrar(res.archived ? 'Promo eliminada. Sus ventas anteriores quedan en el historial.' : 'Promo eliminada correctamente.', 'ok');
     } catch (e: any) {
-      await this.mostrar(this.errorMsg(e) || 'No se pudo eliminar la promo.');
+      await this.mostrarError(e, 'No se pudo eliminar la promo.');
     }
   }
 
@@ -424,9 +576,9 @@ export class ComercioPage {
       }
       this.modal = null;
       await this.loadAll();
-      await this.mostrar(editando ? 'Recompensa actualizada.' : 'Recompensa creada.');
+      await this.mostrar(editando ? 'Recompensa actualizada correctamente.' : 'Recompensa creada correctamente.', 'ok');
     } catch (e: any) {
-      await this.mostrar(this.errorMsg(e) || 'No se pudo guardar la recompensa.');
+      await this.mostrarError(e, 'No se pudo guardar la recompensa.');
     } finally {
       this.saving = false;
       this.cdr.markForCheck();
@@ -436,11 +588,11 @@ export class ComercioPage {
   async eliminarRecompensa(reward: MerchantReward) {
     if (!(await this.confirmar('Eliminar recompensa', `¿Seguro que quieres eliminar "${reward.name}"?`))) return;
     try {
-      await this.merchant.deleteReward(reward.id);
+      const res = await this.merchant.deleteReward(reward.id);
       await this.loadAll();
-      await this.mostrar('Recompensa eliminada.');
+      await this.mostrar(res.archived ? 'Recompensa eliminada. Sus canjes anteriores quedan en el historial.' : 'Recompensa eliminada correctamente.', 'ok');
     } catch (e: any) {
-      await this.mostrar(this.errorMsg(e) || 'No se pudo eliminar la recompensa.');
+      await this.mostrarError(e, 'No se pudo eliminar la recompensa.');
     }
   }
 
@@ -463,9 +615,9 @@ export class ComercioPage {
       });
       this.modal = null;
       await this.loadAll();
-      await this.mostrar('Configuración guardada.');
+      await this.mostrar('Configuración guardada correctamente.', 'ok');
     } catch (e: any) {
-      await this.mostrar(this.errorMsg(e) || 'No se pudo guardar la configuración.');
+      await this.mostrarError(e, 'No se pudo guardar la configuración.');
     } finally {
       this.saving = false;
       this.cdr.markForCheck();
@@ -546,6 +698,15 @@ export class ComercioPage {
     else this.imagenRecompensa = '';
   }
 
+  /** Foto actual del formulario (el selector de imagen se comparte entre promo y recompensa). */
+  fotoDe(destino: FotoDestino): string {
+    return destino === 'promo' ? this.imagenPromo : this.imagenRecompensa;
+  }
+
+  procesandoFoto(destino: FotoDestino): boolean {
+    return destino === 'promo' ? this.procesandoImagenPromo : this.procesandoImagenRecompensa;
+  }
+
   private async validarFoto(file: File): Promise<boolean> {
     if (!FOTO_TIPOS.includes(file.type)) {
       await this.mostrar('La foto debe ser una imagen PNG, JPG o WebP.');
@@ -619,13 +780,13 @@ export class ComercioPage {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
-  private async confirmar(header: string, message: string): Promise<boolean> {
+  private async confirmar(header: string, message: string, accion = 'Eliminar'): Promise<boolean> {
     const alert = await this.alert.create({
       header,
       message,
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
-        { text: 'Eliminar', role: 'destructive' },
+        { text: accion, role: 'destructive' },
       ],
     });
     await alert.present();
@@ -633,13 +794,30 @@ export class ComercioPage {
     return role === 'destructive';
   }
 
-  private errorMsg(e: any): string | undefined {
+  /** Mensaje claro para un error de la API: sin conexión, fallo del servidor o el motivo que explica el backend. */
+  private async mostrarError(e: any, fallback: string) {
+    const status: number | undefined = e?.status;
     const err = e?.error?.error;
-    return err?.details?.[0]?.message || err?.message;
+    let msg: string;
+    if (status === 0) msg = 'Sin conexión con el servidor. Revisa tu internet e inténtalo de nuevo.';
+    else if (status === 401) msg = 'Tu sesión expiró. Vuelve a iniciar sesión.';
+    else if (!status || status >= 500) msg = `${fallback} Inténtalo de nuevo en unos segundos.`;
+    else msg = err?.details?.[0]?.message || err?.message || fallback;
+    await this.mostrar(msg, 'error');
   }
 
-  private async mostrar(message: string) {
-    const toast = await this.toast.create({ message, duration: 2600, position: 'top' });
+  /** Aviso arriba de la pantalla: verde con sonido si salió bien, rojo si falló, azul si es informativo. */
+  private async mostrar(message: string, tipo: Aviso = 'error') {
+    if (tipo === 'ok') playSuccessChime();
+    const icon = tipo === 'ok' ? 'checkmark-circle' : tipo === 'error' ? 'alert-circle' : 'information-circle';
+    const toast = await this.toast.create({
+      message,
+      icon,
+      duration: tipo === 'error' ? 4000 : 2600,
+      position: 'top',
+      cssClass: `snacki-toast snacki-toast-${tipo}`,
+      buttons: [{ icon: 'close', role: 'cancel', side: 'end' }],
+    });
     await toast.present();
   }
 }

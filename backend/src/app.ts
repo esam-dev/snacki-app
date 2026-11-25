@@ -5,6 +5,7 @@ import { errorHandler } from './common/errors/error-handler.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { tenantsRoutes } from './modules/tenants/tenants.routes.js';
 import { merchantRoutes } from './modules/merchant/merchant.routes.js';
+import { claimsRoutes } from './modules/claims/claims.routes.js';
 import { catalogRoutes } from './modules/catalog/catalog.routes.js';
 
 export async function buildApp() {
@@ -26,6 +27,7 @@ export async function buildApp() {
     api.register(authRoutes, { prefix: '/auth' });
     api.register(tenantsRoutes, { prefix: '/tenants' });
     api.register(merchantRoutes, { prefix: '/merchant' });
+    api.register(claimsRoutes, { prefix: '/claims' });
     api.register(catalogRoutes, { prefix: '/catalog' });
   }, { prefix: '/api' });
 

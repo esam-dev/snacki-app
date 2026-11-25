@@ -1,6 +1,6 @@
 <ion-content class="snacki-page dash-page" [fullscreen]="true">
  <div class="dash-wrap">
-  <div class="dash-top">
+  <header class="dash-top">
     <div class="dash-brand">
       <div class="dash-logo">
         @if (settings?.logoUrl) {
@@ -10,31 +10,33 @@
         }
       </div>
       <div class="dash-brand-text">
-        <p class="eyebrow">PANEL DEL COMERCIO</p>
         <h1>{{ comercioNombre }}</h1>
-        <p class="dash-sub">{{ categoriaLabel }}@if (settings?.address) { · {{ settings!.address }} }</p>
+        <p class="dash-sub">
+          <app-icon name="store" />
+          <span>{{ categoriaLabel }}@if (settings?.address) { · {{ settings!.address }} }</span>
+        </p>
       </div>
     </div>
     <div class="dash-actions">
       <button class="icon-btn" type="button" [class.has-dot]="!tieneUbicacion" [attr.aria-label]="tieneUbicacion ? 'Ver ubicación en el mapa' : 'Agregar ubicación'" [title]="tieneUbicacion ? 'Ver ubicación en el mapa' : 'Agregar ubicación'" (click)="abrirMapa()">
-        <ion-icon name="map-outline"></ion-icon>
+        <app-icon name="map" />
       </button>
-      <button class="icon-btn" type="button" aria-label="Configuración" (click)="abrirSettings()">
-        <ion-icon name="settings-outline"></ion-icon>
+      <button class="icon-btn" type="button" aria-label="Configuración" title="Configuración" (click)="abrirSettings()">
+        <app-icon name="settings" />
       </button>
-      <button class="icon-btn" type="button" aria-label="Cerrar sesión" (click)="cerrarSesion()">
-        <ion-icon name="log-out-outline"></ion-icon>
+      <button class="icon-btn" type="button" aria-label="Cerrar sesión" title="Cerrar sesión" (click)="cerrarSesion()">
+        <app-icon name="log-out" />
       </button>
     </div>
-  </div>
+  </header>
 
   @if (loading) {
     <div class="dash-loading"><ion-spinner name="crescent"></ion-spinner></div>
   } @else {
-    <!-- Stats -->
+    <!-- Métricas -->
     <section class="stats-grid" aria-label="Resumen">
       <div class="stat-card">
-        <div class="stat-icon blue"><ion-icon name="pricetags-outline"></ion-icon></div>
+        <div class="stat-icon blue"><app-icon name="tag" /></div>
         <div class="stat-body">
           <span class="stat-label">Promos activas</span>
           <strong class="stat-value">{{ promosActivas }}</strong>
@@ -42,23 +44,28 @@
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon green"><ion-icon name="gift-outline"></ion-icon></div>
+        <div class="stat-icon green"><app-icon name="gift" /></div>
         <div class="stat-body">
           <span class="stat-label">Recompensas</span>
           <strong class="stat-value">{{ recompensasActivas }}</strong>
           <span class="stat-hint">{{ rewards.length }} en total</span>
         </div>
       </div>
-      <div class="stat-card">
-        <div class="stat-icon purple"><ion-icon name="stats-chart-outline"></ion-icon></div>
+      <div class="stat-card" title="Cuántos puntos necesita un cliente, en promedio, para canjear una de tus recompensas.">
+        <div class="stat-icon purple"><app-icon name="chart" /></div>
         <div class="stat-body">
-          <span class="stat-label">Costo promedio</span>
-          <strong class="stat-value">{{ costoPromedio | number }}</strong>
-          <span class="stat-hint">PTS por recompensa</span>
+          <span class="stat-label">Puntos por canje</span>
+          @if (rewards.length) {
+            <strong class="stat-value">{{ costoPromedio | number }} <small class="stat-unit">pts</small></strong>
+            <span class="stat-hint">Promedio de tus recompensas</span>
+          } @else {
+            <strong class="stat-value">—</strong>
+            <span class="stat-hint">Crea una recompensa para verlo</span>
+          }
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon orange"><ion-icon name="time-outline"></ion-icon></div>
+        <div class="stat-icon orange"><app-icon name="clock" /></div>
         <div class="stat-body">
           <span class="stat-label">Puntos expiran</span>
           <strong class="stat-value">{{ diasParaExpirar !== null ? (diasParaExpirar + 'd') : '—' }}</strong>
@@ -67,13 +74,13 @@
       </div>
     </section>
 
-    <!-- Setup checklist (si falta algo) -->
+    <!-- Configuración inicial (si falta algo) -->
     @if (setupProgress < 100) {
-      <section class="setup-card">
+      <section class="panel setup-card">
         <div class="setup-head">
           <div>
-            <p class="eyebrow">CONFIGURACIÓN INICIAL</p>
             <h2>Completa tu perfil</h2>
+            <p class="panel-sub">Termina estos pasos para que los clientes encuentren tu tienda.</p>
           </div>
           <span class="setup-pct">{{ setupProgress }}%</span>
         </div>
@@ -82,9 +89,9 @@
           @for (t of setupTasks; track t.label) {
             <li>
               <button type="button" class="setup-item" [class.done]="t.done" (click)="t.action()">
-                <ion-icon [name]="t.done ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
+                <app-icon [name]="t.done ? 'circle-check' : 'circle'" />
                 <span>{{ t.label }}</span>
-                @if (!t.done) { <ion-icon class="chev" name="chevron-forward-outline"></ion-icon> }
+                @if (!t.done) { <app-icon class="chev" name="chevron-right" /> }
               </button>
             </li>
           }
@@ -92,110 +99,123 @@
       </section>
     }
 
-    <!-- Tabs/sections -->
-    <div class="dash-tabs">
-      <button type="button" [class.active]="section === 'inicio'" (click)="setSection('inicio')">Inicio</button>
-      <button type="button" [class.active]="section === 'promos'" (click)="setSection('promos')">Promos <span class="tab-count">{{ products.length }}</span></button>
-      <button type="button" [class.active]="section === 'recompensas'" (click)="setSection('recompensas')">Recompensas <span class="tab-count">{{ rewards.length }}</span></button>
-    </div>
+    <!-- Pestañas -->
+    <nav class="dash-tabs" aria-label="Secciones">
+      <button type="button" [class.active]="section === 'inicio'" (click)="setSection('inicio')">
+        <app-icon name="grid" /> Inicio
+      </button>
+      <button type="button" [class.active]="section === 'promos'" (click)="setSection('promos')">
+        <app-icon name="tag" /> Promos <span class="tab-count">{{ products.length }}</span>
+      </button>
+      <button type="button" [class.active]="section === 'recompensas'" (click)="setSection('recompensas')">
+        <app-icon name="gift" /> Recompensas <span class="tab-count">{{ rewards.length }}</span>
+      </button>
+    </nav>
 
     <div class="dash-columns" [class.single]="section !== 'inicio'">
-    <!-- Promos section -->
+    <!-- Promos -->
     @if (section === 'inicio' || section === 'promos') {
-      <section class="dash-section">
-        <div class="section-head">
+      <section class="panel">
+        <div class="panel-head">
           <div>
-            <p class="eyebrow">PROMOS</p>
             <h2>Productos promocionales</h2>
+            <p class="panel-sub">{{ promosActivas }} activas · {{ products.length }} en total</p>
           </div>
-          <button class="btn-add" type="button" (click)="abrirPromo()">
-            <ion-icon name="add-outline"></ion-icon> Nueva promo
-          </button>
+          <div class="panel-head-actions">
+            @if (promosActivas) {
+              <button class="btn btn-secondary" type="button" title="Genera un QR para que el cliente sume puntos por su compra" (click)="abrirQr()">
+                <app-icon name="qr" /> Generar QR
+              </button>
+            }
+            <button class="btn btn-primary" type="button" (click)="abrirPromo()">
+              <app-icon name="plus" /> Crear
+            </button>
+          </div>
         </div>
         @if (promosVisibles.length) {
-          <div class="card-list">
+          <ul class="row-list">
             @for (p of promosVisibles; track p.id) {
-              <article class="item-card-dash">
-                <div class="item-thumb">
-                  @if (p.imageUrl) {
-                    <img [src]="p.imageUrl" [alt]="p.name" />
-                  } @else {
-                    <ion-icon name="image-outline"></ion-icon>
+              <li class="row">
+                @if (p.imageUrl) {
+                  <img class="row-thumb" [src]="p.imageUrl" [alt]="p.name" />
+                } @else {
+                  <span class="row-thumb row-thumb-empty" aria-hidden="true"><app-icon name="image" /></span>
+                }
+                <div class="row-info">
+                  <strong class="row-title">{{ p.name }}</strong>
+                  <span class="row-meta">{{ p.points | number }} pts · {{ p.promoStartsAt | date:'dd/MM' }} – {{ p.promoEndsAt | date:'dd/MM/yyyy' }}</span>
+                </div>
+                <span class="status" [class]="'status status-' + promoStatus(p)">{{ promoStatus(p) }}</span>
+                <div class="row-actions">
+                  @if (promoStatus(p) === 'activa') {
+                    <button class="icon-btn sm accent" type="button" [attr.aria-label]="'Generar QR de ' + p.name" title="Generar QR de venta" (click)="abrirQr(p)"><app-icon name="qr" /></button>
                   }
+                  <button class="icon-btn sm" type="button" aria-label="Editar" title="Editar" (click)="abrirPromo(p)"><app-icon name="pencil" /></button>
+                  <button class="icon-btn sm danger" type="button" aria-label="Eliminar" title="Eliminar" (click)="eliminarPromo(p)"><app-icon name="trash" /></button>
                 </div>
-                <div class="item-info">
-                  <div class="item-title-row">
-                    <strong>{{ p.name }}</strong>
-                    <span class="badge" [class]="'badge-' + promoStatus(p)">{{ promoStatus(p) }}</span>
-                  </div>
-                  <span class="item-meta">{{ p.points | number }} PTS</span>
-                  <span class="item-date">{{ p.promoStartsAt | date:'dd/MM' }} – {{ p.promoEndsAt | date:'dd/MM/yyyy' }}</span>
-                </div>
-                <div class="item-actions">
-                  <button type="button" aria-label="Editar" (click)="abrirPromo(p)"><ion-icon name="create-outline"></ion-icon></button>
-                  <button type="button" class="danger" aria-label="Eliminar" (click)="eliminarPromo(p)"><ion-icon name="trash-outline"></ion-icon></button>
-                </div>
-              </article>
+              </li>
             }
-          </div>
+          </ul>
           @if (section === 'inicio' && products.length > 4) {
-            <button class="link-more" type="button" (click)="setSection('promos')">Ver todas las promos ({{ products.length }})</button>
+            <button class="panel-more" type="button" (click)="setSection('promos')">
+              Ver todas las promos ({{ products.length }}) <app-icon name="chevron-right" />
+            </button>
           }
         } @else {
           <div class="empty-dash">
-            <ion-icon name="pricetags-outline"></ion-icon>
-            <p>No tienes promos aún.</p>
-            <button class="btn-add" type="button" (click)="abrirPromo()"><ion-icon name="add-outline"></ion-icon> Crear primera promo</button>
+            <div class="empty-icon"><app-icon name="tag" /></div>
+            <p class="empty-title">Aún no tienes promos</p>
+            <p class="empty-text">Crea una promo para que tus clientes ganen puntos con ella.</p>
+            <button class="btn btn-primary" type="button" (click)="abrirPromo()"><app-icon name="plus" /> Crear promo</button>
           </div>
         }
       </section>
     }
 
-    <!-- Rewards section -->
+    <!-- Recompensas -->
     @if (section === 'inicio' || section === 'recompensas') {
-      <section class="dash-section">
-        <div class="section-head">
+      <section class="panel">
+        <div class="panel-head">
           <div>
-            <p class="eyebrow">RECOMPENSAS</p>
             <h2>Catálogo de canjes</h2>
+            <p class="panel-sub">{{ recompensasActivas }} activas · {{ rewards.length }} en total</p>
           </div>
-          <button class="btn-add" type="button" (click)="abrirRecompensa()">
-            <ion-icon name="add-outline"></ion-icon> Nueva recompensa
+          <button class="btn btn-primary" type="button" (click)="abrirRecompensa()">
+            <app-icon name="plus" /> Crear
           </button>
         </div>
         @if (recompensasVisibles.length) {
-          <div class="card-list">
+          <ul class="row-list">
             @for (r of recompensasVisibles; track r.id) {
-              <article class="item-card-dash">
-                <div class="item-thumb">
-                  @if (r.imageUrl) {
-                    <img [src]="r.imageUrl" [alt]="r.name" />
-                  } @else {
-                    <ion-icon name="image-outline"></ion-icon>
-                  }
+              <li class="row">
+                @if (r.imageUrl) {
+                  <img class="row-thumb" [src]="r.imageUrl" [alt]="r.name" />
+                } @else {
+                  <span class="row-thumb row-thumb-empty" aria-hidden="true"><app-icon name="image" /></span>
+                }
+                <div class="row-info">
+                  <strong class="row-title">{{ r.name }}</strong>
+                  <span class="row-meta">{{ r.cost | number }} pts</span>
                 </div>
-                <div class="item-info">
-                  <div class="item-title-row">
-                    <strong>{{ r.name }}</strong>
-                    @if (!r.isActive) { <span class="badge badge-pausada">inactiva</span> }
-                  </div>
-                  <span class="item-meta">{{ r.cost | number }} PTS</span>
+                <span class="status" [class]="r.isActive ? 'status status-activa' : 'status status-pausada'">{{ r.isActive ? 'activa' : 'inactiva' }}</span>
+                <div class="row-actions">
+                  <button class="icon-btn sm" type="button" aria-label="Editar" title="Editar" (click)="abrirRecompensa(r)"><app-icon name="pencil" /></button>
+                  <button class="icon-btn sm danger" type="button" aria-label="Eliminar" title="Eliminar" (click)="eliminarRecompensa(r)"><app-icon name="trash" /></button>
                 </div>
-                <div class="item-actions">
-                  <button type="button" aria-label="Editar" (click)="abrirRecompensa(r)"><ion-icon name="create-outline"></ion-icon></button>
-                  <button type="button" class="danger" aria-label="Eliminar" (click)="eliminarRecompensa(r)"><ion-icon name="trash-outline"></ion-icon></button>
-                </div>
-              </article>
+              </li>
             }
-          </div>
+          </ul>
           @if (section === 'inicio' && rewards.length > 4) {
-            <button class="link-more" type="button" (click)="setSection('recompensas')">Ver todas las recompensas ({{ rewards.length }})</button>
+            <button class="panel-more" type="button" (click)="setSection('recompensas')">
+              Ver todas las recompensas ({{ rewards.length }}) <app-icon name="chevron-right" />
+            </button>
           }
         } @else {
           <div class="empty-dash">
-            <ion-icon name="gift-outline"></ion-icon>
-            <p>No tienes recompensas aún.</p>
-            <button class="btn-add" type="button" (click)="abrirRecompensa()"><ion-icon name="add-outline"></ion-icon> Crear primera recompensa</button>
+            <div class="empty-icon"><app-icon name="gift" /></div>
+            <p class="empty-title">Aún no tienes recompensas</p>
+            <p class="empty-text">Define qué pueden canjear tus clientes con sus puntos.</p>
+            <button class="btn btn-primary" type="button" (click)="abrirRecompensa()"><app-icon name="plus" /> Crear recompensa</button>
           </div>
         }
       </section>
@@ -205,6 +225,37 @@
 
  </div>
 
+  <!-- Selector de imagen compartido por los modales de promo y recompensa -->
+  <ng-template #imagePicker let-destino>
+    <label class="field-label">Imagen del producto</label>
+    <div class="image-picker">
+      <button class="image-preview" type="button" [disabled]="procesandoFoto(destino)" [attr.aria-label]="fotoDe(destino) ? 'Cambiar imagen' : 'Subir imagen'" (click)="imageInput.click()">
+        @if (procesandoFoto(destino)) {
+          <ion-spinner name="crescent"></ion-spinner>
+        } @else if (fotoDe(destino)) {
+          <img [src]="fotoDe(destino)" alt="Vista previa de la imagen" />
+        } @else {
+          <span class="image-empty">
+            <app-icon name="image-plus" />
+            <span>Haz clic para subir una imagen</span>
+          </span>
+        }
+      </button>
+      <input #imageInput class="logo-file" type="file" accept="image/png,image/jpeg,image/webp" (change)="onFotoSeleccionada($event, destino)" />
+      <div class="logo-actions">
+        <button class="btn btn-secondary" type="button" [disabled]="procesandoFoto(destino)" (click)="imageInput.click()">
+          <app-icon name="upload" /> {{ fotoDe(destino) ? 'Cambiar imagen' : 'Subir imagen' }}
+        </button>
+        @if (fotoDe(destino)) {
+          <button class="btn btn-text danger" type="button" (click)="quitarFoto(destino)">
+            <app-icon name="trash" /> Quitar
+          </button>
+        }
+        <span class="field-hint">PNG, JPG o WebP · máx. 15 MB · se ajusta a 800 px</span>
+      </div>
+    </div>
+  </ng-template>
+
   <!-- Modal: Promo -->
   <ion-modal class="dash-modal" [isOpen]="modal === 'promo'" (didDismiss)="onModalDismiss('promo')">
     <ng-template>
@@ -212,39 +263,16 @@
         <ion-toolbar>
           <ion-title>{{ editingPromoId ? 'Editar promo' : 'Nueva promo' }}</ion-title>
           <ion-buttons slot="end">
-            <button class="modal-close" type="button" aria-label="Cerrar" (click)="cerrarModal()"><ion-icon name="close-outline"></ion-icon></button>
+            <button class="icon-btn ghost" type="button" aria-label="Cerrar" (click)="cerrarModal()"><app-icon name="close" /></button>
           </ion-buttons>
         </ion-toolbar>
       </ion-header>
       <ion-content class="modal-body">
         <label class="field-label">Nombre *</label>
         <input class="field-input" type="text" [(ngModel)]="nombrePromo" placeholder="Ej. Café nuevo" maxlength="120" />
+        <ng-container *ngTemplateOutlet="imagePicker; context: { $implicit: 'promo' }"></ng-container>
         <label class="field-label">Descripción</label>
         <textarea class="field-textarea" [(ngModel)]="descripcionPromo" placeholder="Opcional" maxlength="500"></textarea>
-        <label class="field-label">Foto</label>
-        <div class="logo-picker">
-          <div class="logo-preview">
-            @if (procesandoImagenPromo) {
-              <ion-spinner name="crescent"></ion-spinner>
-            } @else if (imagenPromo) {
-              <img [src]="imagenPromo" alt="Vista previa de la foto de la promo" />
-            } @else {
-              <ion-icon name="image-outline"></ion-icon>
-            }
-          </div>
-          <div class="logo-actions">
-            <input #fotoPromoInput class="logo-file" type="file" accept="image/png,image/jpeg,image/webp" (change)="onFotoSeleccionada($event, 'promo')" />
-            <button class="btn-secondary" type="button" [disabled]="procesandoImagenPromo" (click)="fotoPromoInput.click()">
-              <ion-icon name="cloud-upload-outline"></ion-icon> {{ imagenPromo ? 'Cambiar foto' : 'Subir foto' }}
-            </button>
-            @if (imagenPromo) {
-              <button class="btn-link danger" type="button" (click)="quitarFoto('promo')">
-                <ion-icon name="trash-outline"></ion-icon> Quitar
-              </button>
-            }
-            <span class="logo-hint">PNG, JPG o WebP · se ajusta a 800 px</span>
-          </div>
-        </div>
         <label class="field-label">Puntos *</label>
         <input class="field-input" type="number" [(ngModel)]="puntosPromo" placeholder="Ej. 250" min="1" max="100000" />
         <div class="field-row">
@@ -257,79 +285,58 @@
             <input class="field-input" type="datetime-local" [(ngModel)]="promoEndsAt" />
           </div>
         </div>
-        <label class="field-check">
-          <input type="checkbox" [(ngModel)]="promoActiva" /> Promo activa
+        <label class="field-switch">
+          <input type="checkbox" role="switch" [(ngModel)]="promoActiva" />
+          <span class="switch-track" aria-hidden="true"></span>
+          <span>Promo activa</span>
         </label>
       </ion-content>
       <ion-footer class="modal-footer">
-        <button class="btn-ghost" type="button" (click)="cerrarModal()">Cancelar</button>
-        <button class="btn-primary" type="button" [disabled]="saving || procesandoImagenPromo" (click)="guardarPromo()">
+        <button class="btn btn-secondary" type="button" (click)="cerrarModal()">Cancelar</button>
+        <button class="btn btn-primary" type="button" [disabled]="saving || procesandoImagenPromo" (click)="guardarPromo()">
           {{ saving ? 'Guardando...' : (editingPromoId ? 'Guardar cambios' : 'Publicar promo') }}
         </button>
       </ion-footer>
     </ng-template>
   </ion-modal>
 
-  <!-- Modal: Reward -->
+  <!-- Modal: Recompensa -->
   <ion-modal class="dash-modal" [isOpen]="modal === 'reward'" (didDismiss)="onModalDismiss('reward')">
     <ng-template>
       <ion-header>
         <ion-toolbar>
           <ion-title>{{ editingRewardId ? 'Editar recompensa' : 'Nueva recompensa' }}</ion-title>
           <ion-buttons slot="end">
-            <button class="modal-close" type="button" aria-label="Cerrar" (click)="cerrarModal()"><ion-icon name="close-outline"></ion-icon></button>
+            <button class="icon-btn ghost" type="button" aria-label="Cerrar" (click)="cerrarModal()"><app-icon name="close" /></button>
           </ion-buttons>
         </ion-toolbar>
       </ion-header>
       <ion-content class="modal-body">
         <label class="field-label">Nombre *</label>
         <input class="field-input" type="text" [(ngModel)]="nombreRecompensa" placeholder="Ej. Café gratis" maxlength="120" />
+        <ng-container *ngTemplateOutlet="imagePicker; context: { $implicit: 'reward' }"></ng-container>
         <label class="field-label">Descripción</label>
         <textarea class="field-textarea" [(ngModel)]="descripcionRecompensa" placeholder="Opcional" maxlength="500"></textarea>
-        <label class="field-label">Foto</label>
-        <div class="logo-picker">
-          <div class="logo-preview">
-            @if (procesandoImagenRecompensa) {
-              <ion-spinner name="crescent"></ion-spinner>
-            } @else if (imagenRecompensa) {
-              <img [src]="imagenRecompensa" alt="Vista previa de la foto de la recompensa" />
-            } @else {
-              <ion-icon name="image-outline"></ion-icon>
-            }
-          </div>
-          <div class="logo-actions">
-            <input #fotoRecompensaInput class="logo-file" type="file" accept="image/png,image/jpeg,image/webp" (change)="onFotoSeleccionada($event, 'reward')" />
-            <button class="btn-secondary" type="button" [disabled]="procesandoImagenRecompensa" (click)="fotoRecompensaInput.click()">
-              <ion-icon name="cloud-upload-outline"></ion-icon> {{ imagenRecompensa ? 'Cambiar foto' : 'Subir foto' }}
-            </button>
-            @if (imagenRecompensa) {
-              <button class="btn-link danger" type="button" (click)="quitarFoto('reward')">
-                <ion-icon name="trash-outline"></ion-icon> Quitar
-              </button>
-            }
-            <span class="logo-hint">PNG, JPG o WebP · se ajusta a 800 px</span>
-          </div>
-        </div>
         <label class="field-label">Costo en puntos *</label>
         <input class="field-input" type="number" [(ngModel)]="costoPuntos" placeholder="Ej. 500" min="1" max="100000" />
       </ion-content>
       <ion-footer class="modal-footer">
-        <button class="btn-ghost" type="button" (click)="cerrarModal()">Cancelar</button>
-        <button class="btn-primary" type="button" [disabled]="saving || procesandoImagenRecompensa" (click)="guardarRecompensa()">
+        <button class="btn btn-secondary" type="button" (click)="cerrarModal()">Cancelar</button>
+        <button class="btn btn-primary" type="button" [disabled]="saving || procesandoImagenRecompensa" (click)="guardarRecompensa()">
           {{ saving ? 'Guardando...' : (editingRewardId ? 'Guardar cambios' : 'Crear recompensa') }}
         </button>
       </ion-footer>
     </ng-template>
   </ion-modal>
 
-  <!-- Modal: Settings -->
+  <!-- Modal: Configuración -->
   <ion-modal class="dash-modal" [isOpen]="modal === 'settings'" (didDismiss)="onModalDismiss('settings')">
     <ng-template>
       <ion-header>
         <ion-toolbar>
           <ion-title>Configuración del comercio</ion-title>
           <ion-buttons slot="end">
-            <button class="modal-close" type="button" aria-label="Cerrar" (click)="cerrarModal()"><ion-icon name="close-outline"></ion-icon></button>
+            <button class="icon-btn ghost" type="button" aria-label="Cerrar" (click)="cerrarModal()"><app-icon name="close" /></button>
           </ion-buttons>
         </ion-toolbar>
       </ion-header>
@@ -352,20 +359,20 @@
             } @else if (settingsLogoUrl) {
               <img [src]="settingsLogoUrl" alt="Vista previa del logo" />
             } @else {
-              <ion-icon name="image-outline"></ion-icon>
+              <app-icon name="image" />
             }
           </div>
           <div class="logo-actions">
             <input #logoInput class="logo-file" type="file" accept="image/png,image/jpeg" (change)="onLogoSelected($event)" />
-            <button class="btn-secondary" type="button" [disabled]="procesandoLogo" (click)="logoInput.click()">
-              <ion-icon name="cloud-upload-outline"></ion-icon> {{ settingsLogoUrl ? 'Cambiar logo' : 'Subir logo' }}
+            <button class="btn btn-secondary" type="button" [disabled]="procesandoLogo" (click)="logoInput.click()">
+              <app-icon name="upload" /> {{ settingsLogoUrl ? 'Cambiar logo' : 'Subir logo' }}
             </button>
             @if (settingsLogoUrl) {
-              <button class="btn-link danger" type="button" (click)="quitarLogo()">
-                <ion-icon name="trash-outline"></ion-icon> Quitar
+              <button class="btn btn-text danger" type="button" (click)="quitarLogo()">
+                <app-icon name="trash" /> Quitar
               </button>
             }
-            <span class="logo-hint">PNG o JPG · máx. 5 MB · se ajusta a 512 px</span>
+            <span class="field-hint">PNG o JPG · máx. 5 MB · se ajusta a 512 px</span>
           </div>
         </div>
         <div class="field-row">
@@ -378,15 +385,15 @@
             <input class="field-input" type="number" [(ngModel)]="settingsLng" (ngModelChange)="actualizarMapaSettings()" step="any" />
           </div>
         </div>
-        <button class="btn-secondary" type="button" (click)="usarMiUbicacion()">
-          <ion-icon name="navigate-outline"></ion-icon> Usar mi ubicación
+        <button class="btn btn-secondary btn-block-sm" type="button" (click)="usarMiUbicacion()">
+          <app-icon name="locate" /> Usar mi ubicación
         </button>
         <div class="map-frame map-preview">
           @if (settingsMapUrl) {
             <iframe [src]="settingsMapUrl" title="Vista previa de la ubicación" loading="lazy"></iframe>
           } @else {
             <div class="map-empty">
-              <ion-icon name="map-outline"></ion-icon>
+              <app-icon name="map" />
               <span>Ingresa latitud y longitud o usa tu ubicación para ver el mapa.</span>
             </div>
           }
@@ -395,10 +402,101 @@
         <input class="field-input" type="date" [(ngModel)]="settingsPointsExpireAt" />
       </ion-content>
       <ion-footer class="modal-footer">
-        <button class="btn-ghost" type="button" (click)="cerrarModal()">Cancelar</button>
-        <button class="btn-primary" type="button" [disabled]="saving || procesandoLogo" (click)="guardarSettings()">
+        <button class="btn btn-secondary" type="button" (click)="cerrarModal()">Cancelar</button>
+        <button class="btn btn-primary" type="button" [disabled]="saving || procesandoLogo" (click)="guardarSettings()">
           {{ saving ? 'Guardando...' : 'Guardar configuración' }}
         </button>
+      </ion-footer>
+    </ng-template>
+  </ion-modal>
+
+  <!-- Modal: QR de venta -->
+  <ion-modal class="dash-modal" [isOpen]="modal === 'qr'" (didDismiss)="onModalDismiss('qr')">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>
+            <span class="modal-brand">
+              <img src="assets/icon/qr-logo.png" alt="" aria-hidden="true" />
+              {{ qrResult ? 'Muestra este QR al cliente' : 'Generar QR de venta' }}
+            </span>
+          </ion-title>
+          <ion-buttons slot="end">
+            <button class="icon-btn ghost" type="button" aria-label="Cerrar" (click)="cerrarModal()"><app-icon name="close" /></button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="modal-body">
+        @if (!qrResult) {
+          <p class="qr-intro">
+            <app-icon name="info" />
+            <span>Cuando vendas un producto en promo, genera su QR. El cliente lo escanea con Snacki y suma los puntos en tu tienda.</span>
+          </p>
+
+          <label class="field-label" for="qr-promo">¿Qué vendiste? *</label>
+          <select id="qr-promo" class="field-input" [(ngModel)]="qrProductId">
+            @for (p of promosParaQr; track p.id) {
+              <option [value]="p.id">{{ p.name }} · {{ p.points | number }} pts</option>
+            }
+          </select>
+
+          <label class="field-label">Cantidad</label>
+          <div class="qty-stepper">
+            <button class="icon-btn" type="button" aria-label="Quitar una unidad" [disabled]="qrCantidad <= 1" (click)="cambiarCantidadQr(-1)"><app-icon name="minus" /></button>
+            <span class="qty-value" aria-live="polite">{{ qrCantidad }}</span>
+            <button class="icon-btn" type="button" aria-label="Agregar una unidad" [disabled]="qrCantidad >= qrMaxCantidad" (click)="cambiarCantidadQr(1)"><app-icon name="plus" /></button>
+          </div>
+
+          <div class="qr-summary">
+            <span>El cliente sumará</span>
+            <strong>{{ qrPuntosTotales | number }} pts</strong>
+          </div>
+        } @else {
+          <div class="qr-result">
+            <div class="qr-box" [class.dimmed]="qrStatus !== 'pending'">
+              <img [src]="qrImage" [alt]="'QR de ' + qrResult.product.name" />
+              @if (qrStatus === 'claimed') {
+                <div class="qr-overlay ok"><app-icon name="circle-check" /><span>Escaneado</span></div>
+              } @else if (qrStatus === 'expired') {
+                <div class="qr-overlay off"><app-icon name="clock" /><span>{{ qrAnulado ? 'Anulado' : 'Venció' }}</span></div>
+              }
+            </div>
+            <strong class="qr-points">+{{ qrResult.points | number }} pts</strong>
+            <span class="qr-product">{{ qrResult.product.name }}@if (qrResult.quantity > 1) { × {{ qrResult.quantity }} }</span>
+
+            @switch (qrStatus) {
+              @case ('pending') {
+                <span class="qr-state pending"><ion-spinner name="dots"></ion-spinner> Esperando que el cliente lo escanee</span>
+              }
+              @case ('claimed') {
+                <span class="qr-state ok"><app-icon name="circle-check" /> ¡Listo! El cliente ya sumó sus puntos</span>
+              }
+              @case ('expired') {
+                <span class="qr-state off"><app-icon name="clock" /> {{ qrAnulado ? 'QR anulado: ya nadie puede usarlo.' : 'Este QR venció. Genera uno nuevo.' }}</span>
+              }
+            }
+
+            @if (qrStatus === 'pending') {
+              <p class="qr-note">Un solo uso · válido por {{ qrRestante }}</p>
+              <button class="btn btn-text danger qr-void" type="button" [disabled]="anulandoQr" (click)="anularQr()">
+                <app-icon name="close" /> {{ anulandoQr ? 'Anulando...' : 'Anular QR (venta cancelada)' }}
+              </button>
+            }
+          </div>
+        }
+      </ion-content>
+      <ion-footer class="modal-footer">
+        @if (!qrResult) {
+          <button class="btn btn-secondary" type="button" (click)="cerrarModal()">Cancelar</button>
+          <button class="btn btn-primary" type="button" [disabled]="generandoQr || !qrProductId" (click)="generarQr()">
+            <app-icon name="qr" /> {{ generandoQr ? 'Generando...' : 'Generar QR' }}
+          </button>
+        } @else {
+          <button class="btn btn-secondary" type="button" (click)="cerrarModal()">Cerrar</button>
+          <button class="btn btn-primary" type="button" (click)="nuevoQr()">
+            <app-icon name="refresh" /> Otra venta
+          </button>
+        }
       </ion-footer>
     </ng-template>
   </ion-modal>
@@ -410,7 +508,7 @@
         <ion-toolbar>
           <ion-title>Ubicación de la tienda</ion-title>
           <ion-buttons slot="end">
-            <button class="modal-close" type="button" aria-label="Cerrar" (click)="cerrarModal()"><ion-icon name="close-outline"></ion-icon></button>
+            <button class="icon-btn ghost" type="button" aria-label="Cerrar" (click)="cerrarModal()"><app-icon name="close" /></button>
           </ion-buttons>
         </ion-toolbar>
       </ion-header>
@@ -421,19 +519,19 @@
           }
         </div>
         <div class="map-info">
-          <ion-icon name="location-outline"></ion-icon>
+          <app-icon name="map-pin" />
           <div>
             <strong>{{ settings?.address || 'Sin dirección' }}</strong>
             <span>{{ settings?.latitude }}, {{ settings?.longitude }}</span>
           </div>
         </div>
-        <a class="btn-secondary map-link" [href]="googleMapsUrl" target="_blank" rel="noopener">
-          <ion-icon name="open-outline"></ion-icon> Abrir en Google Maps
+        <a class="btn btn-secondary map-link" [href]="googleMapsUrl" target="_blank" rel="noopener">
+          <app-icon name="external-link" /> Abrir en Google Maps
         </a>
       </ion-content>
       <ion-footer class="modal-footer">
-        <button class="btn-ghost" type="button" (click)="cerrarModal()">Cerrar</button>
-        <button class="btn-primary" type="button" (click)="editarUbicacion()">Editar ubicación</button>
+        <button class="btn btn-secondary" type="button" (click)="cerrarModal()">Cerrar</button>
+        <button class="btn btn-primary" type="button" (click)="editarUbicacion()">Editar ubicación</button>
       </ion-footer>
     </ng-template>
   </ion-modal>

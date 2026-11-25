@@ -79,6 +79,7 @@ describe('AuthService (backend auth)', () => {
     await tokenStorage.setToken('jwt-token');
 
     const promise = auth.restoreSession();
+    await Promise.resolve(); // getToken() es async: la request se emite en el siguiente microtask
     const req = httpMock.expectOne(`${environment.apiBaseUrl}/api/auth/me`);
     expect(req.request.headers.get('Authorization')).toBeNull(); // interceptor not registered in this testbed; request still made
     req.flush({

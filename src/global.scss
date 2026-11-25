@@ -154,3 +154,17 @@ ion-checkbox.snacki-check {
   margin: 6px 0;
   &::part(label) { white-space: normal; }
 }
+
+/* Avisos del panel: verde = salió bien, rojo = falló, azul = información. */
+ion-toast.snacki-toast {
+  --border-radius: 10px;
+  --box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+  --color: #fff;
+  --button-color: rgba(255, 255, 255, .85);
+  --max-width: 460px;
+  font-weight: 500;
+}
+ion-toast.snacki-toast::part(icon) { font-size: 22px; }
+ion-toast.snacki-toast-ok { --background: #1e8e3e; }
+ion-toast.snacki-toast-error { --background: #d93025; }
+ion-toast.snacki-toast-info { --background: #1a73e8; }
