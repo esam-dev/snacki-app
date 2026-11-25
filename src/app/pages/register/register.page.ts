@@ -1,8 +1,8 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
-import { IonButton, IonCheckbox, IonContent, IonIcon, IonInput, IonSelect, IonSelectOption, ToastController } from '@ionic/angular';
+import { ActivatedRoute } from '@angular/router';
+import { IonButton, IonCheckbox, IonContent, IonIcon, IonInput, IonSelect, IonSelectOption, NavController, ToastController } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { eyeOffOutline, eyeOutline } from 'ionicons/icons';
 import { firstValueFrom } from 'rxjs';
@@ -20,7 +20,8 @@ interface TenantOption { id: string; name: string; slug: string; }
   imports: [IonContent, IonInput, IonButton, IonCheckbox, IonIcon, IonSelect, IonSelectOption, FormsModule, SnackiHeaderComponent],
 })
 export class RegisterPage implements OnInit {
-  private router = inject(Router);
+  private nav = inject(NavController);
+  private cdr = inject(ChangeDetectorRef);
   private toast = inject(ToastController);
   private auth = inject(AuthService);
   private route = inject(ActivatedRoute);
@@ -43,7 +44,7 @@ export class RegisterPage implements OnInit {
     try {
       const res = await firstValueFrom(this.http.get<ApiResponse<{ tenants: TenantOption[] }>>(`${environment.apiBaseUrl}/api/tenants`));
       this.locales = (res.data?.tenants || []).filter((t) => t.slug !== 'snacki');
-    } catch { this.locales = []; } finally { this.cargandoLocales = false; }
+    } catch { this.locales = []; } finally { this.cargandoLocales = false; this.cdr.markForCheck(); }
   }
 
   async registrar() {
@@ -62,8 +63,8 @@ export class RegisterPage implements OnInit {
     try {
       const result = await this.auth.register(f.nombre, f.correo, f.password, this.tipoCuenta, f.comercioId || undefined);
       if (!result.success) return this.mostrarToast(result.message || 'No se pudo crear la cuenta.', 'danger');
-      this.router.navigateByUrl(this.destinoSeguro());
-    } finally { this.enviando = false; }
+      await this.nav.navigateRoot(this.destinoSeguro(), { replaceUrl: true });
+    } finally { this.enviando = false; this.cdr.markForCheck(); }
   }
 
   agregarFoto() {}

@@ -162,3 +162,11 @@ select.field-input{appearance:none;background-image:linear-gradient(45deg,transp
 .map-preview{height:200px;margin:0 0 8px}
 .map-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;height:100%;padding:16px;text-align:center;color:#8a8d96;font-size:12px}
 .map-empty ion-icon{font-size:30px}
+
+/* Miniatura de promos/recompensas: foto o marcador cuando todavía no tiene */
+.item-thumb{display:grid;place-items:center;flex:0 0 56px;width:56px;height:56px;border-radius:10px;overflow:hidden;background:#f6f7f9;border:1px dashed #c9ccd4;color:#8a8f9c}
+.item-thumb img{flex:none;width:100%;height:100%;border-radius:0;object-fit:cover}
+.item-thumb ion-icon{font-size:22px}
+@media (max-width:520px){
+  .item-thumb{flex-basis:48px;width:48px;height:48px}
+}

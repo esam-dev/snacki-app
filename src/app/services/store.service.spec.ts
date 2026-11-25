@@ -1,7 +1,8 @@
-﻿import { TestBed } from '@angular/core/testing';
+import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 import { Producto, StoreService } from './store.service';
 import { TokenStorageService } from './token-storage.service';
@@ -181,5 +182,51 @@ describe('StoreService', () => {
   it('impide que un cliente modifique el catálogo del comercio', () => {
     const cliente = crearStore(CLIENTE);
     expect(cliente.agregarRecompensa('burger-house', 'Oferta no autorizada', 150)).toBe(false);
+  });
+
+  describe('catálogo del servidor', () => {
+    const URL_CATALOGO = `${environment.apiBaseUrl}/api/catalog/tenants`;
+
+    it('refleja en el cliente las promos, recompensas, logo y vencimiento que publica el comercio', async () => {
+      const store = crearStore(CLIENTE);
+      const httpMock = TestBed.inject(HttpTestingController);
+
+      const promesa = store.refrescarCatalogo();
+      httpMock.expectOne(URL_CATALOGO).flush({
+        data: {
+          tenants: [{
+            id: 't1', slug: 'burger-house', name: 'Burger House', category: 'comida_rapida', address: null,
+            logoUrl: '/api/catalog/images/tenant/t1?v=1', pointsExpireAt: '2027-03-01T00:00:00.000Z',
+            products: [{
+              id: 'p1', name: 'Combo nuevo', description: null, points: 300, imageUrl: null,
+              promoStartsAt: '2026-11-01T00:00:00.000Z', promoEndsAt: '2026-12-31T00:00:00.000Z',
+            }],
+            rewards: [{ id: 'r1', name: 'Papas gratis', description: null, cost: 600, imageUrl: '/api/catalog/images/reward/r1?v=2' }],
+          }],
+        },
+      });
+
+      expect(await promesa).toBe(true);
+      const local = store.getById('burger-house');
+      expect(local?.nombre).toBe('Burger House');
+      expect(local?.logo).toBe(`${environment.apiBaseUrl}/api/catalog/images/tenant/t1?v=1`);
+      expect(local?.vencimiento).toBe('2027-03-01');
+      expect(local?.promos.map((p) => p.nombre)).toEqual(['Combo nuevo']);
+      expect(local?.productos.map((p) => p.nombre)).toEqual(['Papas gratis']);
+      expect(local?.productos[0]?.imagen).toBe(`${environment.apiBaseUrl}/api/catalog/images/reward/r1?v=2`);
+      expect(local?.puntos).toBe(1250); // saldo de demostración conservado
+      expect(store.getById('pizza-hut')).toBeUndefined(); // ya no está en el catálogo del servidor
+    });
+
+    it('si el servidor falla se mantiene el último catálogo conocido', async () => {
+      const store = crearStore(CLIENTE);
+      const httpMock = TestBed.inject(HttpTestingController);
+
+      const promesa = store.refrescarCatalogo();
+      httpMock.expectOne(URL_CATALOGO).flush({ error: {} }, { status: 500, statusText: 'Server Error' });
+
+      expect(await promesa).toBe(false);
+      expect(store.getById('burger-house')?.productos.length).toBeGreaterThan(0);
+    });
   });
 });

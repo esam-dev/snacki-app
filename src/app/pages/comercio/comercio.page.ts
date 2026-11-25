@@ -2,8 +2,7 @@ import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { Router } from '@angular/router';
-import { AlertController, IonButtons, IonContent, IonFooter, IonHeader, IonIcon, IonModal, IonSpinner, IonTitle, IonToolbar, ToastController } from '@ionic/angular';
+import { AlertController, IonButtons, IonContent, IonFooter, IonHeader, IonIcon, IonModal, IonSpinner, IonTitle, IonToolbar, NavController, ToastController } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import {
   addOutline,
@@ -44,6 +43,15 @@ interface SetupTask {
   action: () => void;
 }
 
+/** Tipos de imagen que acepta el selector de fotos de promos y recompensas. */
+const FOTO_TIPOS = ['image/png', 'image/jpeg', 'image/webp'];
+/** Las fotos de celular pesan varios MB; se reducen antes de enviarlas, así que el tope de entrada es amplio. */
+const FOTO_MAX_BYTES = 15 * 1024 * 1024;
+/** El backend rechaza imágenes de más de 1 000 000 de caracteres (ver imageRefSchema). */
+const IMAGEN_MAX_CHARS = 900_000;
+
+type FotoDestino = 'promo' | 'reward';
+
 export const CATEGORIAS = [
   { value: 'comida_rapida', label: 'Comida rápida' },
   { value: 'pizza', label: 'Pizza' },
@@ -61,7 +69,7 @@ export const CATEGORIAS = [
 export class ComercioPage {
   private auth = inject(AuthService);
   private merchant = inject(MerchantService);
-  private router = inject(Router);
+  private nav = inject(NavController);
   private toast = inject(ToastController);
   private alert = inject(AlertController);
   private cdr = inject(ChangeDetectorRef);
@@ -92,12 +100,16 @@ export class ComercioPage {
   promoStartsAt = '';
   promoEndsAt = '';
   promoActiva = true;
+  imagenPromo = '';
+  procesandoImagenPromo = false;
 
   // reward form
   editingRewardId: string | null = null;
   nombreRecompensa = '';
   descripcionRecompensa = '';
   costoPuntos: number | string | null = null;
+  imagenRecompensa = '';
+  procesandoImagenRecompensa = false;
 
   // settings form
   settingsName = '';
@@ -248,6 +260,8 @@ export class ComercioPage {
     this.promoStartsAt = p ? this.toLocalInput(p.promoStartsAt) : '';
     this.promoEndsAt = p ? this.toLocalInput(p.promoEndsAt) : '';
     this.promoActiva = p?.isActive ?? true;
+    this.imagenPromo = p?.imageUrl ?? '';
+    this.procesandoImagenPromo = false;
     this.modal = 'promo';
   }
 
@@ -256,6 +270,8 @@ export class ComercioPage {
     this.nombreRecompensa = r?.name ?? '';
     this.descripcionRecompensa = r?.description ?? '';
     this.costoPuntos = r?.cost ?? null;
+    this.imagenRecompensa = r?.imageUrl ?? '';
+    this.procesandoImagenRecompensa = false;
     this.modal = 'reward';
   }
 
@@ -325,7 +341,7 @@ export class ComercioPage {
   }
 
   async guardarPromo() {
-    if (this.saving) return;
+    if (this.saving || this.procesandoImagenPromo) return;
     const puntos = Number(this.puntosPromo);
     const puntosValido = Number.isInteger(puntos) && puntos > 0 && puntos <= 100000;
     const nombre = this.nombrePromo.trim();
@@ -342,7 +358,7 @@ export class ComercioPage {
     const editando = !!this.editingPromoId;
     this.saving = true;
     try {
-      const payload = {
+      const payload: { name: string; description: string | null; points: number; promoStartsAt: string; promoEndsAt: string; isActive: boolean; imageUrl?: string | null } = {
         name: nombre,
         description: this.descripcionPromo.trim() || null,
         points: puntos,
@@ -350,6 +366,10 @@ export class ComercioPage {
         promoEndsAt: fin.toISOString(),
         isActive: this.promoActiva,
       };
+      // Al editar solo se reenvía la imagen si cambió (puede pesar cientos de KB); null la elimina.
+      const imagenOriginal = this.products.find((p) => p.id === this.editingPromoId)?.imageUrl ?? '';
+      const imagenCambio = editando ? this.imagenPromo !== imagenOriginal : !!this.imagenPromo;
+      if (imagenCambio) payload.imageUrl = this.imagenPromo || null;
       if (this.editingPromoId) {
         await this.merchant.updateProduct(this.editingPromoId, payload);
       } else {
@@ -378,7 +398,7 @@ export class ComercioPage {
   }
 
   async guardarRecompensa() {
-    if (this.saving) return;
+    if (this.saving || this.procesandoImagenRecompensa) return;
     const puntos = Number(this.costoPuntos);
     const costoValido = Number.isInteger(puntos) && puntos > 0 && puntos <= 100000;
     const nombre = this.nombreRecompensa.trim();
@@ -389,7 +409,14 @@ export class ComercioPage {
     const editando = !!this.editingRewardId;
     this.saving = true;
     try {
-      const payload = { name: nombre, description: this.descripcionRecompensa.trim() || null, cost: puntos };
+      const payload: { name: string; description: string | null; cost: number; imageUrl?: string | null } = {
+        name: nombre,
+        description: this.descripcionRecompensa.trim() || null,
+        cost: puntos,
+      };
+      const imagenOriginal = this.rewards.find((r) => r.id === this.editingRewardId)?.imageUrl ?? '';
+      const imagenCambio = editando ? this.imagenRecompensa !== imagenOriginal : !!this.imagenRecompensa;
+      if (imagenCambio) payload.imageUrl = this.imagenRecompensa || null;
       if (this.editingRewardId) {
         await this.merchant.updateReward(this.editingRewardId, payload);
       } else {
@@ -492,8 +519,69 @@ export class ComercioPage {
     this.settingsLogoUrl = '';
   }
 
-  /** Reduce la imagen a `max` px de lado y la devuelve como data URL (PNG conserva transparencia). */
-  private redimensionarImagen(file: File, max: number): Promise<string> {
+  // ---------- fotos de promos y recompensas ----------
+
+  /** Foto elegida en el formulario de una promo o recompensa (al crear o al editar). */
+  async onFotoSeleccionada(event: Event, destino: FotoDestino) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = ''; // permite volver a elegir el mismo archivo
+    if (!file) return;
+    if (!(await this.validarFoto(file))) return;
+
+    this.setProcesandoFoto(destino, true);
+    try {
+      const data = await this.prepararFoto(file);
+      if (destino === 'promo') this.imagenPromo = data;
+      else this.imagenRecompensa = data;
+    } catch {
+      await this.mostrar('No se pudo leer la imagen. Prueba con otra foto.');
+    } finally {
+      this.setProcesandoFoto(destino, false);
+    }
+  }
+
+  quitarFoto(destino: FotoDestino) {
+    if (destino === 'promo') this.imagenPromo = '';
+    else this.imagenRecompensa = '';
+  }
+
+  private async validarFoto(file: File): Promise<boolean> {
+    if (!FOTO_TIPOS.includes(file.type)) {
+      await this.mostrar('La foto debe ser una imagen PNG, JPG o WebP.');
+      return false;
+    }
+    if (file.size > FOTO_MAX_BYTES) {
+      await this.mostrar('La imagen supera los 15 MB.');
+      return false;
+    }
+    return true;
+  }
+
+  private setProcesandoFoto(destino: FotoDestino, valor: boolean) {
+    if (destino === 'promo') this.procesandoImagenPromo = valor;
+    else this.procesandoImagenRecompensa = valor;
+    this.cdr.markForCheck();
+  }
+
+  /**
+   * Convierte la foto en JPEG (fondo blanco si tenía transparencia) de hasta 800 px y, si aún pesa
+   * demasiado para el backend, vuelve a comprimirla con menos calidad/tamaño.
+   */
+  private async prepararFoto(file: File): Promise<string> {
+    const intentos: Array<[number, number]> = [[800, 0.82], [800, 0.7], [640, 0.65], [512, 0.55]];
+    for (const [max, calidad] of intentos) {
+      const data = await this.redimensionarImagen(file, max, 'image/jpeg', calidad);
+      if (data.length <= IMAGEN_MAX_CHARS) return data;
+    }
+    throw new Error('size');
+  }
+
+  /**
+   * Reduce la imagen a `max` px de lado y la devuelve como data URL. Por defecto conserva el formato
+   * del archivo (el PNG mantiene la transparencia); con `image/jpeg` se rellena el fondo de blanco.
+   */
+  private redimensionarImagen(file: File, max: number, tipo: string = file.type, calidad = 0.85): Promise<string> {
     return new Promise((resolve, reject) => {
       const url = URL.createObjectURL(file);
       const img = new Image();
@@ -501,12 +589,16 @@ export class ComercioPage {
         URL.revokeObjectURL(url);
         const scale = Math.min(1, max / Math.max(img.width, img.height));
         const canvas = document.createElement('canvas');
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
         const ctx = canvas.getContext('2d');
         if (!ctx) return reject(new Error('canvas'));
+        if (tipo === 'image/jpeg') {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(file.type === 'image/png' ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', 0.85));
+        resolve(tipo === 'image/png' ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', calidad));
       };
       img.onerror = () => {
         URL.revokeObjectURL(url);
@@ -518,7 +610,7 @@ export class ComercioPage {
 
   async cerrarSesion() {
     await this.auth.cerrarSesion();
-    this.router.navigateByUrl('/login');
+    await this.nav.navigateRoot('/login', { replaceUrl: true });
   }
 
   private toLocalInput(iso: string): string {

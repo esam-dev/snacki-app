@@ -12,10 +12,10 @@ Objetivo: que el negocio **dé a conocer rápido sus productos nuevos**. Solo lo
 ## 2. Estado actual
 | Hecho | Falta |
 |---|---|
-| Pantallas Ionic (login, registro, home, explorar, tienda, QR, puntos, perfil, comercio) | Conectar puntos/catálogo/canje al backend (hoy en `localStorage`, `store.service.ts`) |
+| Pantallas Ionic (login, registro, home, explorar, tienda, QR, puntos, perfil, comercio) | Conectar puntos/canje al backend (hoy en `localStorage`, `store.service.ts`); el catálogo ya viene del backend |
 | Escáner QR (`@capacitor-mlkit/barcode-scanning`) | QR firmado generado por el comercio |
-| Backend Fastify + Prisma + Postgres: `/auth/*`, `/tenants` | Promos, recompensas, QR, puntos, canjes, stats, geolocalización, notificaciones |
-| Front usa la API para auth; `@capacitor-community/sqlite` instalado sin usar | SQLite offline + sincronización, mapa, push, Railway, Android, informe |
+| Backend Fastify + Prisma + Postgres: `/auth/*`, `/tenants`, `/merchant/*` (promos, recompensas y ajustes, con foto), `/catalog/*` (catálogo e imágenes para el cliente) | QR, puntos, canjes, stats, geolocalización, notificaciones |
+| Front usa la API para auth, panel del comercio (con subida de fotos) y catálogo del cliente (promos vigentes, recompensas, logo; se refresca al entrar, al volver a la app y cada 60 s); `@capacitor-community/sqlite` instalado sin usar | SQLite offline + sincronización, mapa, push, Railway, Android, informe |
 
 ## 3. Arquitectura
 ```
@@ -61,8 +61,8 @@ Sincronización (`SyncService`):
 
 ## 6. API
 **Comercio** (rol `comercio`, solo su tenant)
-- `GET/POST/PATCH/DELETE /api/merchant/products`
-- `GET/POST/PATCH/DELETE /api/merchant/rewards`
+- `GET/POST/PATCH/DELETE /api/merchant/products` (acepta `imageUrl`: foto PNG/JPG como data URL, URL o ruta de assets)
+- `GET/POST/PATCH/DELETE /api/merchant/rewards` (igual, con `imageUrl`)
 - `PATCH /api/merchant/settings` (`pointsExpireAt`, dirección, lat/lng, categoría, logo)
 - `POST /api/merchant/qr` `{productId, quantity}` → `{token, expiresAt}` (JWT con `QR_SECRET`, contiene solo `claimId`)
 - `GET /api/merchant/redemptions` · `PATCH /api/merchant/redemptions/:id/deliver`
@@ -70,6 +70,8 @@ Sincronización (`SyncService`):
 - `POST /api/merchant/notifications` `{title, body, productId?}` → envía push a sus clientes · `GET` historial
 
 **Cliente**
+- `GET /api/catalog/tenants` ✅ (comercios activos con promos vigentes y recompensas activas; requiere sesión)
+- `GET /api/catalog/images/:kind/:id` ✅ (`kind` = `tenant|product|reward`; sirve las fotos subidas por el comercio, pública y cacheable)
 - `GET /api/promos?category=&lat=&lng=` (promos vigentes, "lo nuevo")
 - `GET /api/tenants/nearby?lat=&lng=&radiusKm=` (comercios adheridos con distancia)
 - `GET /api/tenants/:slug` (promos vigentes + recompensas)

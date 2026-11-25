@@ -15,7 +15,9 @@
         <span class="name">{{ local.nombre }}</span>
         <span class="detail">
           Pts. Asociados: {{ local.puntos | number }} PTS
-          <small class="venc">Vencimiento: {{ local.vencimiento | date: 'dd/MM/yyyy' }}</small>
+          @if (local.vencimiento) {
+            <small class="venc">Vencimiento: {{ local.vencimiento | date: 'dd/MM/yyyy' }}</small>
+          }
         </span>
       </div>
     }

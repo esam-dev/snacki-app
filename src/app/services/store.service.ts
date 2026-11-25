@@ -1,11 +1,28 @@
-﻿import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Injectable, inject, signal } from '@angular/core';
+import { firstValueFrom, timeout } from 'rxjs';
+import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 import { emptyRecord, readJson, writeJson } from './demo-storage';
 
+/** Recompensa canjeable por puntos. */
 export interface Producto {
   nombre: string;
   puntos: number;
   imagen: string;
+  id?: string;
+  descripcion?: string;
+}
+
+/** Promo vigente del comercio: al comprarla en el local se acumulan `puntos`. */
+export interface Promo {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  puntos: number;
+  imagen: string;
+  inicio: string;
+  fin: string;
 }
 
 export interface Local {
@@ -15,6 +32,19 @@ export interface Local {
   puntos: number;
   vencimiento: string;
   productos: Producto[];
+  promos: Promo[];
+  categoria?: string;
+  direccion?: string;
+}
+
+interface ApiPromo {
+  id: string; name: string; description: string | null; points: number;
+  imageUrl: string | null; promoStartsAt: string; promoEndsAt: string;
+}
+interface ApiReward { id: string; name: string; description: string | null; cost: number; imageUrl: string | null; }
+interface ApiTenant {
+  id: string; slug: string; name: string; category: string; address: string | null;
+  logoUrl: string | null; pointsExpireAt: string | null; products: ApiPromo[]; rewards: ApiReward[];
 }
 
 export interface MovimientoPuntos {
@@ -36,18 +66,31 @@ const STATE_KEY = 'snacki.demo-state';
 const LEGACY_SALDOS_KEY = 'snacki.point-balances';
 const LEGACY_MOVIMIENTOS_KEY = 'snacki.point-movements';
 const OFERTAS_KEY = 'snacki.store-offers';
+const CATALOGO_KEY = 'snacki.catalog-cache';
+const IMAGEN_POR_DEFECTO = 'assets/icon/icon-snacki.png';
+const CATALOGO_TIMEOUT_MS = 10_000;
 
 /** Estado local para la demo; en producción los saldos deben venir del backend. */
 @Injectable({ providedIn: 'root' })
 export class StoreService {
   private auth = inject(AuthService);
-  private readonly locales: Local[] = [
+  private http = inject(HttpClient);
+
+  /** Sube cada vez que el catálogo del servidor cambia; las pantallas lo observan para repintarse. */
+  readonly catalogoVersion = signal(0);
+  private catalogoRemoto: Local[] | null = this.leerCatalogoCache();
+  private ultimaActualizacion = 0;
+  private refrescando: Promise<boolean> | null = null;
+
+  /** Catálogo de demostración: se usa mientras no haya datos del servidor (primer arranque sin conexión). */
+  private readonly localesBase: Local[] = [
     {
       id: 'burger-house',
       nombre: 'Burger House',
       logo: 'assets/img/logo-burger-house.png',
       puntos: 1250,
       vencimiento: '2027-01-01',
+      promos: [],
       productos: [
         { nombre: 'Combo Bacon Burger', puntos: 600, imagen: 'assets/img/prod-combo-bacon.jpg' },
         { nombre: 'Helado de Vainilla', puntos: 100, imagen: 'assets/img/prod-helado.jpg' },
@@ -55,10 +98,45 @@ export class StoreService {
         { nombre: 'Ensalada Cesar', puntos: 400, imagen: 'assets/img/prod-ensalada.jpg' },
       ],
     },
-    { id: 'pizza-hut', nombre: 'Pizza Hut', logo: 'assets/img/logo-pizza-hut.png', puntos: 6250, vencimiento: '2027-01-03', productos: [] },
-    { id: 'quattro-d', nombre: 'Quattro d', logo: 'assets/img/logo-quattro-d.png', puntos: 3000, vencimiento: '2027-01-02', productos: [] },
-    { id: 'spaghettoteca', nombre: 'Spaghettoteca', logo: 'assets/img/logo-spaghettoteca.png', puntos: 2000, vencimiento: '2027-01-05', productos: [] },
+    { id: 'pizza-hut', nombre: 'Pizza Hut', logo: 'assets/img/logo-pizza-hut.png', puntos: 6250, vencimiento: '2027-01-03', promos: [], productos: [] },
+    { id: 'quattro-d', nombre: 'Quattro d', logo: 'assets/img/logo-quattro-d.png', puntos: 3000, vencimiento: '2027-01-02', promos: [], productos: [] },
+    { id: 'spaghettoteca', nombre: 'Spaghettoteca', logo: 'assets/img/logo-spaghettoteca.png', puntos: 2000, vencimiento: '2027-01-05', promos: [], productos: [] },
   ];
+
+  /** Comercios visibles: los del servidor cuando ya se descargaron; si no, el catálogo de demostración. */
+  private get locales(): Local[] {
+    return this.catalogoRemoto ?? this.localesBase;
+  }
+
+  /**
+   * Descarga lo que publican los comercios (datos, logo, promos vigentes y recompensas activas).
+   * Devuelve true si el catálogo se actualizó. `maxEdadMs` evita repetir la descarga si es reciente.
+   */
+  refrescarCatalogo(maxEdadMs = 0): Promise<boolean> {
+    if (this.refrescando) return this.refrescando;
+    if (maxEdadMs > 0 && Date.now() - this.ultimaActualizacion < maxEdadMs) return Promise.resolve(false);
+
+    this.refrescando = (async () => {
+      try {
+        const res = await firstValueFrom(
+          this.http
+            .get<{ data: { tenants: ApiTenant[] } }>(`${environment.apiBaseUrl}/api/catalog/tenants`)
+            .pipe(timeout(CATALOGO_TIMEOUT_MS)),
+        );
+        this.catalogoRemoto = (res.data?.tenants ?? []).map((tenant) => this.mapearTenant(tenant));
+        this.ultimaActualizacion = Date.now();
+        writeJson(CATALOGO_KEY, this.catalogoRemoto);
+        this.catalogoVersion.update((v) => v + 1);
+        return true;
+      } catch {
+        // Sin conexión o servidor caído: se sigue con el último catálogo conocido.
+        return false;
+      } finally {
+        this.refrescando = null;
+      }
+    })();
+    return this.refrescando;
+  }
 
   getAll(): Local[] {
     const saldos = this.leerSaldosUsuario();
@@ -360,7 +438,60 @@ export class StoreService {
   }
 
   private getProductos(local: Local): Producto[] {
-    return [...local.productos, ...this.leerOfertasDeLocal(this.leerOfertas(), local.id)];
+    // Con catálogo del servidor las recompensas vienen de ahí; las ofertas guardadas en el dispositivo son de la demo.
+    const extras = this.catalogoRemoto ? [] : this.leerOfertasDeLocal(this.leerOfertas(), local.id);
+    return [...local.productos, ...extras];
+  }
+
+  private mapearTenant(tenant: ApiTenant): Local {
+    // El saldo de demostración de los comercios conocidos se conserva; los nuevos arrancan en 0.
+    const base = this.localesBase.find((item) => item.id === tenant.slug);
+    return {
+      id: tenant.slug,
+      nombre: tenant.name,
+      logo: this.resolverImagen(tenant.logoUrl) || IMAGEN_POR_DEFECTO,
+      puntos: base?.puntos ?? 0,
+      vencimiento: tenant.pointsExpireAt ? tenant.pointsExpireAt.slice(0, 10) : '',
+      categoria: tenant.category,
+      direccion: tenant.address ?? undefined,
+      productos: (tenant.rewards ?? []).map((reward) => ({
+        id: reward.id,
+        nombre: reward.name,
+        puntos: reward.cost,
+        imagen: this.resolverImagen(reward.imageUrl) || IMAGEN_POR_DEFECTO,
+        descripcion: reward.description ?? '',
+      })),
+      promos: (tenant.products ?? []).map((promo) => ({
+        id: promo.id,
+        nombre: promo.name,
+        descripcion: promo.description ?? '',
+        puntos: promo.points,
+        imagen: this.resolverImagen(promo.imageUrl) || IMAGEN_POR_DEFECTO,
+        inicio: promo.promoStartsAt,
+        fin: promo.promoEndsAt,
+      })),
+    };
+  }
+
+  /** Las fotos subidas por el comercio se sirven desde el backend (`/api/...`); las demás se usan tal cual. */
+  private resolverImagen(url: string | null | undefined): string {
+    if (!url) return '';
+    return url.startsWith('/api/') ? `${environment.apiBaseUrl}${url}` : url;
+  }
+
+  private leerCatalogoCache(): Local[] | null {
+    const raw = readJson<unknown>(CATALOGO_KEY, null);
+    if (!Array.isArray(raw)) return null;
+    const locales = raw.filter((item): item is Local => this.esLocalCacheado(item));
+    return locales.length === raw.length ? locales : null;
+  }
+
+  private esLocalCacheado(item: unknown): boolean {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
+    const raw = item as Record<string, unknown>;
+    return typeof raw['id'] === 'string' && typeof raw['nombre'] === 'string' && typeof raw['logo'] === 'string'
+      && typeof raw['puntos'] === 'number' && typeof raw['vencimiento'] === 'string'
+      && Array.isArray(raw['productos']) && Array.isArray(raw['promos']);
   }
 
   private leerOfertas(): Record<string, Producto[]> {
@@ -402,7 +533,7 @@ export class StoreService {
     const imagen = raw['imagen'];
     if (typeof nombre !== 'string') return null;
     const cleanName = nombre.trim();
-    if (!cleanName || cleanName.length > 60) return null;
+    if (!cleanName || cleanName.length > 120) return null;
     if (typeof puntos !== 'number' || !Number.isSafeInteger(puntos) || puntos < 1 || puntos > 100000) return null;
     if (typeof imagen !== 'string') return null;
     return { nombre: cleanName, puntos, imagen };

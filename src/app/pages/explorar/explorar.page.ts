@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, effect, inject, untracked } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { IonContent, IonIcon } from '@ionic/angular';
@@ -22,6 +22,10 @@ export class ExplorarPage implements OnInit {
 
   constructor() {
     addIcons({ cardOutline });
+    effect(() => {
+      this.stores.catalogoVersion();
+      untracked(() => this.cargarDatos());
+    });
   }
 
   ngOnInit() {
@@ -30,6 +34,7 @@ export class ExplorarPage implements OnInit {
 
   ionViewWillEnter() {
     this.cargarDatos();
+    void this.stores.refrescarCatalogo(3000);
   }
 
   private cargarDatos() {
