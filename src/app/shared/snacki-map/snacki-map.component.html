@@ -1,0 +1,46 @@
+<div
+  class="mapa"
+  [class.seleccionable]="seleccionable()"
+  role="application"
+  aria-label="Mapa"
+  (pointerdown)="alPresionar($event)"
+  (pointermove)="alMover($event)"
+  (pointerup)="alSoltar($event)"
+  (pointercancel)="cancelarArrastre()"
+  (wheel)="alRueda($event)"
+>
+  @for (t of teselas(); track t.clave) {
+    <img class="tesela" [src]="t.src" [style.left.px]="t.x" [style.top.px]="t.y" alt="" draggable="false" />
+  }
+
+  @if (usuarioPx(); as u) {
+    <span class="usuario" [style.left.px]="u.x" [style.top.px]="u.y" aria-label="Tu ubicación"></span>
+  }
+
+  @for (m of marcadoresPx(); track m.id) {
+    <button
+      type="button"
+      class="marcador"
+      [class.activo]="m.activo"
+      [style.left.px]="m.x"
+      [style.top.px]="m.y"
+      [attr.aria-label]="m.etiqueta || 'Comercio'"
+      (pointerdown)="detener($event)"
+      (click)="marcadorClick.emit(m.id)"
+    >
+      <app-icon name="map-pin" [strokeWidth]="2" />
+      @if (m.activo && m.etiqueta) { <span class="etiqueta">{{ m.etiqueta }}</span> }
+    </button>
+  }
+
+  @if (pinPx(); as p) {
+    <span class="pin" [style.left.px]="p.x" [style.top.px]="p.y" aria-label="Ubicación elegida"><app-icon name="map-pin" [strokeWidth]="2" /></span>
+  }
+
+  <div class="controles">
+    <button type="button" aria-label="Acercar" (pointerdown)="detener($event)" (click)="acercar()"><app-icon name="plus" /></button>
+    <button type="button" aria-label="Alejar" (pointerdown)="detener($event)" (click)="alejar()"><app-icon name="minus" /></button>
+  </div>
+
+  <a class="atribucion" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener" (pointerdown)="detener($event)">© OpenStreetMap</a>
+</div>
