@@ -67,7 +67,12 @@ export const createQrSchema = z.object({
   quantity: z.number().int().min(1).max(QR_MAX_QUANTITY).default(1),
 });
 
+export const createRedeemQrSchema = z.object({
+  rewardId: z.string().uuid('Recompensa inválida'),
+});
+
 export type CreateQrInput = z.infer<typeof createQrSchema>;
+export type CreateRedeemQrInput = z.infer<typeof createRedeemQrSchema>;
 export type CreateProductInput = z.infer<typeof createProductSchema>;
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;
 export type CreateRewardInput = z.infer<typeof createRewardSchema>;

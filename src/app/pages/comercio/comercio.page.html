@@ -199,6 +199,7 @@
                 </div>
                 <span class="status" [class]="r.isActive ? 'status status-activa' : 'status status-pausada'">{{ r.isActive ? 'activa' : 'inactiva' }}</span>
                 <div class="row-actions">
+                  <button class="icon-btn sm accent" type="button" [attr.aria-label]="'QR de canje de ' + r.name" title="Generar QR de canje (el cliente lo escanea para usar sus puntos)" [disabled]="!r.isActive" (click)="abrirQrCanje(r)"><app-icon name="qr" /></button>
                   <button class="icon-btn sm" type="button" aria-label="Editar" title="Editar" (click)="abrirRecompensa(r)"><app-icon name="pencil" /></button>
                   <button class="icon-btn sm danger" type="button" aria-label="Eliminar" title="Eliminar" (click)="eliminarRecompensa(r)"><app-icon name="trash" /></button>
                 </div>
@@ -410,7 +411,7 @@
     </ng-template>
   </ion-modal>
 
-  <!-- Modal: QR de venta -->
+  <!-- Modal: QR de venta (suma puntos) o de canje (gasta puntos en una recompensa) -->
   <ion-modal class="dash-modal" [isOpen]="modal === 'qr'" (didDismiss)="onModalDismiss('qr')">
     <ng-template>
       <ion-header>
@@ -418,7 +419,7 @@
           <ion-title>
             <span class="modal-brand">
               <img src="assets/icon/qr-logo.png" alt="" aria-hidden="true" />
-              {{ qrResult ? 'Muestra este QR al cliente' : 'Generar QR de venta' }}
+              {{ qrResult ? 'Muestra este QR al cliente' : qrTipo === 'canje' ? 'QR de canje' : 'Generar QR de venta' }}
             </span>
           </ion-title>
           <ion-buttons slot="end">
@@ -427,7 +428,9 @@
         </ion-toolbar>
       </ion-header>
       <ion-content class="modal-body">
-        @if (!qrResult) {
+        @if (!qrResult && qrTipo === 'canje') {
+          <p class="qr-intro"><ion-spinner name="dots"></ion-spinner><span>Generando QR de canje...</span></p>
+        } @else if (!qrResult) {
           <p class="qr-intro">
             <app-icon name="info" />
             <span>Cuando vendas un producto en promo, genera su QR. El cliente lo escanea con Snacki y suma los puntos en tu tienda.</span>
@@ -461,15 +464,20 @@
                 <div class="qr-overlay off"><app-icon name="clock" /><span>{{ qrAnulado ? 'Anulado' : 'Venció' }}</span></div>
               }
             </div>
-            <strong class="qr-points">+{{ qrResult.points | number }} pts</strong>
-            <span class="qr-product">{{ qrResult.product.name }}@if (qrResult.quantity > 1) { × {{ qrResult.quantity }} }</span>
+            <strong class="qr-points">{{ qrTipo === 'canje' ? '−' : '+' }}{{ qrResult.points | number }} pts</strong>
+            <span class="qr-product">@if (qrTipo === 'canje') { Canje: }{{ qrResult.product.name }}@if (qrResult.quantity > 1) { × {{ qrResult.quantity }} }</span>
 
             @switch (qrStatus) {
               @case ('pending') {
                 <span class="qr-state pending"><ion-spinner name="dots"></ion-spinner> Esperando que el cliente lo escanee</span>
               }
               @case ('claimed') {
-                <span class="qr-state ok"><app-icon name="circle-check" /> ¡Listo! El cliente ya sumó sus puntos</span>
+                @if (qrTipo === 'canje') {
+                  <span class="qr-state ok"><app-icon name="circle-check" /> Canje confirmado: entrega la recompensa{{ qrCliente ? ' a ' + qrCliente : '' }}</span>
+                  @if (qrCodigo) { <p class="qr-note">Código de canje: <strong>{{ qrCodigo }}</strong></p> }
+                } @else {
+                  <span class="qr-state ok"><app-icon name="circle-check" /> ¡Listo! El cliente ya sumó sus puntos</span>
+                }
               }
               @case ('expired') {
                 <span class="qr-state off"><app-icon name="clock" /> {{ qrAnulado ? 'QR anulado: ya nadie puede usarlo.' : 'Este QR venció. Genera uno nuevo.' }}</span>
@@ -477,16 +485,18 @@
             }
 
             @if (qrStatus === 'pending') {
-              <p class="qr-note">Un solo uso · válido por {{ qrRestante }}</p>
+              <p class="qr-note">Un solo uso · válido por {{ qrRestante }}@if (qrTipo === 'canje') { · los puntos se descuentan cuando el cliente lo escanea }</p>
               <button class="btn btn-text danger qr-void" type="button" [disabled]="anulandoQr" (click)="anularQr()">
-                <app-icon name="close" /> {{ anulandoQr ? 'Anulando...' : 'Anular QR (venta cancelada)' }}
+                <app-icon name="close" /> {{ anulandoQr ? 'Anulando...' : qrTipo === 'canje' ? 'Anular QR de canje' : 'Anular QR (venta cancelada)' }}
               </button>
             }
           </div>
         }
       </ion-content>
       <ion-footer class="modal-footer">
-        @if (!qrResult) {
+        @if (!qrResult && qrTipo === 'canje') {
+          <button class="btn btn-secondary" type="button" (click)="cerrarModal()">Cancelar</button>
+        } @else if (!qrResult) {
           <button class="btn btn-secondary" type="button" (click)="cerrarModal()">Cancelar</button>
           <button class="btn btn-primary" type="button" [disabled]="generandoQr || !qrProductId" (click)="generarQr()">
             <app-icon name="qr" /> {{ generandoQr ? 'Generando...' : 'Generar QR' }}
@@ -494,7 +504,7 @@
         } @else {
           <button class="btn btn-secondary" type="button" (click)="cerrarModal()">Cerrar</button>
           <button class="btn btn-primary" type="button" (click)="nuevoQr()">
-            <app-icon name="refresh" /> Otra venta
+            <app-icon name="refresh" /> {{ qrTipo === 'canje' ? 'Otro canje' : 'Otra venta' }}
           </button>
         }
       </ion-footer>

@@ -21,9 +21,9 @@ export class TabsPage {
 
     // Los cambios del comercio (promos, recompensas, logo, vencimiento) llegan al cliente:
     // al entrar, al volver a la app y de forma periódica mientras está abierta.
-    void this.stores.refrescarCatalogo();
+    void this.stores.refrescar();
     const alVolver = () => {
-      if (document.visibilityState === 'visible') void this.stores.refrescarCatalogo(5000);
+      if (document.visibilityState === 'visible') void this.stores.refrescar(5000);
     };
     document.addEventListener('visibilitychange', alVolver);
     const timer = window.setInterval(alVolver, CATALOGO_REFRESCO_MS);

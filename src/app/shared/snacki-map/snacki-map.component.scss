@@ -1,0 +1,113 @@
+:host { display: block; width: 100%; height: 100%; }
+
+.mapa {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #e9edf2;
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+.mapa.seleccionable { cursor: crosshair; }
+.mapa:active { cursor: grabbing; }
+
+.tesela {
+  position: absolute;
+  width: 256px;
+  height: 256px;
+  max-width: none;
+  pointer-events: none;
+}
+
+.marcador, .pin {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  line-height: 0;
+  color: #357bff;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35));
+  app-icon { font-size: 34px; }
+}
+.marcador { cursor: pointer; }
+.marcador.activo { color: #e5484d; z-index: 3; app-icon { font-size: 40px; } }
+.pin { color: #e5484d; z-index: 4; pointer-events: none; }
+
+.etiqueta {
+  position: absolute;
+  bottom: 100%;
+  margin-bottom: 2px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: #171923;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  filter: none;
+}
+
+.usuario {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 50%;
+  background: #1a73e8;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 6px rgba(26, 115, 232, .22);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.controles {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .3);
+  button {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: #fff;
+    color: #303440;
+    cursor: pointer;
+    app-icon { font-size: 20px; }
+  }
+  button + button { border-top: 1px solid #ececf0; }
+}
+
+.atribucion {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, .8);
+  color: #303440;
+  font-size: 10px;
+  text-decoration: none;
+}
+
+/* El SVG lo dibuja IconComponent en tiempo de ejecución: se rellena el pin para que se vea sólido. */
+:host ::ng-deep .marcador app-icon svg,
+:host ::ng-deep .pin app-icon svg { fill: currentColor; fill-opacity: .9; stroke: #fff; }
+:host ::ng-deep .marcador app-icon svg circle,
+:host ::ng-deep .pin app-icon svg circle { fill: #fff; stroke: none; }

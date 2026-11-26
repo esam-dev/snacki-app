@@ -37,19 +37,21 @@ enum DevicePlatform {
 }
 
 model User {
-  id            String              @id @default(uuid()) @db.Uuid
-  email         String              @unique
-  passwordHash  String              @map("password_hash")
-  fullName      String              @map("full_name")
-  isActive      Boolean             @default(true) @map("is_active")
-  createdAt     DateTime            @default(now()) @map("created_at")
-  updatedAt     DateTime            @updatedAt @map("updated_at")
-  memberships   UserTenantRoleMap[]
-  claimsCreated PurchaseClaim[]     @relation("ClaimCreatedBy")
-  claimsClaimed PurchaseClaim[]     @relation("ClaimClaimedBy")
-  pointEntries  PointEntry[]
-  redemptions   Redemption[]
-  devices       DeviceToken[]
+  id               String              @id @default(uuid()) @db.Uuid
+  email            String              @unique
+  passwordHash     String              @map("password_hash")
+  fullName         String              @map("full_name")
+  isActive         Boolean             @default(true) @map("is_active")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+  memberships      UserTenantRoleMap[]
+  claimsCreated    PurchaseClaim[]     @relation("ClaimCreatedBy")
+  claimsClaimed    PurchaseClaim[]     @relation("ClaimClaimedBy")
+  redeemQrsCreated RedemptionClaim[]   @relation("RedeemQrCreatedBy")
+  redeemQrsClaimed RedemptionClaim[]   @relation("RedeemQrClaimedBy")
+  pointEntries     PointEntry[]
+  redemptions      Redemption[]
+  devices          DeviceToken[]
 
   @@map("users")
 }
@@ -73,6 +75,7 @@ model Tenant {
   claims         PurchaseClaim[]
   pointEntries   PointEntry[]
   redemptions    Redemption[]
+  redeemQrs      RedemptionClaim[]
   notifications  Notification[]
 
   @@index([latitude, longitude])
@@ -97,19 +100,19 @@ model UserTenantRoleMap {
 
 /// Producto promocional: solo da puntos mientras la promo está vigente.
 model Product {
-  id            String          @id @default(uuid()) @db.Uuid
-  tenantId      String          @map("tenant_id") @db.Uuid
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
   name          String
   description   String?
   points        Int
-  imageUrl      String?         @map("image_url")
-  promoStartsAt DateTime        @map("promo_starts_at")
-  promoEndsAt   DateTime        @map("promo_ends_at")
-  isActive      Boolean         @default(true) @map("is_active")
+  imageUrl      String?   @map("image_url")
+  promoStartsAt DateTime  @map("promo_starts_at")
+  promoEndsAt   DateTime  @map("promo_ends_at")
+  isActive      Boolean   @default(true) @map("is_active")
   /// Borrado lógico: se archiva en vez de borrar si ya tiene ventas (QR), para no perder el historial de puntos.
-  deletedAt     DateTime?       @map("deleted_at")
-  createdAt     DateTime        @default(now()) @map("created_at")
-  updatedAt     DateTime        @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
   tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   claims        PurchaseClaim[]
@@ -120,21 +123,22 @@ model Product {
 }
 
 model Reward {
-  id          String   @id @default(uuid()) @db.Uuid
-  tenantId    String   @map("tenant_id") @db.Uuid
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
   name        String
   description String?
   cost        Int
-  imageUrl    String?  @map("image_url")
-  isActive    Boolean  @default(true) @map("is_active")
+  imageUrl    String?   @map("image_url")
+  isActive    Boolean   @default(true) @map("is_active")
   /// Borrado lógico: se archiva en vez de borrar si ya tiene canjes.
   deletedAt   DateTime? @map("deleted_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   pointEntries PointEntry[]
   redemptions  Redemption[]
+  redeemQrs    RedemptionClaim[]
 
   @@index([tenantId, isActive])
   @@map("rewards")
@@ -198,12 +202,38 @@ model Redemption {
   deliveredAt DateTime?        @map("delivered_at")
   createdAt   DateTime         @default(now()) @map("created_at")
 
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  reward Reward @relation(fields: [rewardId], references: [id], onDelete: Restrict)
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  reward   Reward           @relation(fields: [rewardId], references: [id], onDelete: Restrict)
+  redeemQr RedemptionClaim?
 
   @@index([tenantId, status, createdAt])
   @@map("redemptions")
+}
+
+/// QR de canje: lo genera el comercio para una recompensa y el cliente lo escanea en el local.
+/// Un solo uso y vence a los pocos minutos: así no se pueden gastar puntos sin estar frente al comercio.
+model RedemptionClaim {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  rewardId     String    @map("reward_id") @db.Uuid
+  /// Costo fijado al generar el QR (lo que ve el cliente al confirmar).
+  cost         Int
+  expiresAt    DateTime  @map("expires_at")
+  createdById  String    @map("created_by_id") @db.Uuid
+  claimedById  String?   @map("claimed_by_id") @db.Uuid
+  claimedAt    DateTime? @map("claimed_at")
+  redemptionId String?   @unique @map("redemption_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  reward     Reward      @relation(fields: [rewardId], references: [id], onDelete: Restrict)
+  createdBy  User        @relation("RedeemQrCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  claimedBy  User?       @relation("RedeemQrClaimedBy", fields: [claimedById], references: [id], onDelete: SetNull)
+  redemption Redemption? @relation(fields: [redemptionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@map("redemption_claims")
 }
 
 model DeviceToken {

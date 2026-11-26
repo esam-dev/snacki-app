@@ -1,20 +1,85 @@
 <ion-content class="snacki-page" [fullscreen]="true">
-  <app-snacki-header></app-snacki-header>
+  <div class="snacki-wrap">
+    <app-snacki-header></app-snacki-header>
 
-  <section class="points-card snacki-card">
-    <div class="caption"><ion-icon name="card-outline"></ion-icon> Puntos totales.</div>
-    <div class="value">{{ total | number }} PTS</div>
-  </section>
+    <header class="explore-head">
+      <div class="titles">
+        <h1>Explorar comercios</h1>
+        <p>Suma puntos con sus promos y canjéalos en el mismo local.</p>
+      </div>
+      <section class="points-card snacki-card" aria-label="Puntos totales">
+        <div class="caption"><ion-icon name="card-outline" aria-hidden="true"></ion-icon> Puntos totales</div>
+        <div class="value">{{ total | number }} <span>PTS</span></div>
+      </section>
+    </header>
 
-  <div class="item-grid">
-    @for (local of locales; track local.id) {
-      <article class="item-card" (click)="abrir(local)">
-        <div class="media"><img [src]="local.logo" [alt]="local.nombre" /></div>
-        <div class="info">
-          <div class="name">{{ local.nombre }}</div>
-          <div class="pts">{{ local.puntos | number }} PTS</div>
+    <div class="toolbar">
+      <ion-searchbar
+        class="explore-search"
+        placeholder="Buscar por nombre o dirección"
+        [debounce]="200"
+        (ionInput)="buscar($event)"
+      ></ion-searchbar>
+
+      @if (filtros.length > 1) {
+        <div class="chips" role="tablist" aria-label="Filtrar por categoría">
+          <button type="button" role="tab" class="chip" [class.active]="categoria === 'todas'" [attr.aria-selected]="categoria === 'todas'" (click)="elegirCategoria('todas')">Todas</button>
+          @for (f of filtros; track f.id) {
+            <button type="button" role="tab" class="chip" [class.active]="categoria === f.id" [attr.aria-selected]="categoria === f.id" (click)="elegirCategoria(f.id)">{{ f.nombre }}</button>
+          }
         </div>
-      </article>
-    }
+      }
+    </div>
+
+    <p class="count">{{ resultados.length }} {{ resultados.length === 1 ? 'comercio' : 'comercios' }}</p>
+
+    <div class="merchant-grid">
+      @for (local of resultados; track local.id) {
+        <button type="button" class="merchant-card snacki-card" (click)="abrir(local)" [attr.aria-label]="'Abrir ' + local.nombre">
+          <div class="media">
+            <img [src]="local.logo" alt="" loading="lazy" />
+            @if (local.promos.length) {
+              <span class="badge">{{ local.promos.length }} {{ local.promos.length === 1 ? 'promo' : 'promos' }}</span>
+            }
+          </div>
+
+          <div class="body">
+            <div class="top">
+              <strong class="name">{{ local.nombre }}</strong>
+              <span class="pts">{{ local.puntos | number }} <small>PTS</small></span>
+            </div>
+
+            @if (nombreCategoria(local) || local.direccion) {
+              <div class="meta">
+                @if (nombreCategoria(local)) { <span><ion-icon name="pricetag-outline" aria-hidden="true"></ion-icon>{{ nombreCategoria(local) }}</span> }
+                @if (local.direccion) { <span class="addr"><ion-icon name="location-outline" aria-hidden="true"></ion-icon>{{ local.direccion }}</span> }
+              </div>
+            }
+
+            <div class="meta">
+              <span><ion-icon name="gift-outline" aria-hidden="true"></ion-icon>{{ local.productos.length }} {{ local.productos.length === 1 ? 'recompensa' : 'recompensas' }}</span>
+            </div>
+
+            @if (usaWallet && (local.siguienteRecompensa || local.canjeables)) {
+              <div class="progress">
+                <div class="bar"><span [style.width.%]="progreso(local)"></span></div>
+                <small>
+                  @if (local.siguienteRecompensa; as meta) {
+                    Faltan {{ meta.faltan | number }} PTS para {{ meta.nombre }}
+                  } @else {
+                    ¡Puedes canjear todo!
+                  }
+                </small>
+              </div>
+            }
+          </div>
+        </button>
+      } @empty {
+        <div class="empty">
+          <ion-icon name="storefront-outline" aria-hidden="true"></ion-icon>
+          <p>No encontramos comercios con ese filtro.</p>
+        </div>
+      }
+    </div>
   </div>
 </ion-content>
