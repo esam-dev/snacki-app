@@ -4,13 +4,12 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { AlertController, IonButton, IonContent, ToastController } from '@ionic/angular';
 import { Local, Producto, StoreService } from '../../services/store.service';
 import { SnackiHeaderComponent } from '../../shared/snacki-header/snacki-header.component';
-import { InicioBarComponent } from '../../shared/inicio-bar/inicio-bar.component';
 
 @Component({
   selector: 'app-tienda',
   templateUrl: './tienda.page.html',
   styleUrls: ['./tienda.page.scss'],
-  imports: [IonContent, IonButton, DecimalPipe, SnackiHeaderComponent, InicioBarComponent],
+  imports: [IonContent, IonButton, DecimalPipe, SnackiHeaderComponent],
 })
 export class TiendaPage implements OnInit {
   private route = inject(ActivatedRoute);
