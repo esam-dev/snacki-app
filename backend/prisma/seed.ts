@@ -133,6 +133,18 @@ async function main() {
       });
     }
 
+    // Sucursal de demostración: asistente de Burger House (sus cambios de catálogo requieren aprobación).
+    const sucursal = await prisma.user.upsert({
+      where: { email: 'sucursal@snacki.demo' },
+      update: { fullName: 'Sucursal Demo', passwordHash, isActive: true },
+      create: { email: 'sucursal@snacki.demo', fullName: 'Sucursal Demo', passwordHash, isActive: true },
+    });
+    await prisma.userTenantRoleMap.upsert({
+      where: { userId_tenantId: { userId: sucursal.id, tenantId: tenantIds['burger-house'] } },
+      update: { role: 'comercio', staffRole: 'assistant' },
+      create: { userId: sucursal.id, tenantId: tenantIds['burger-house'], role: 'comercio', staffRole: 'assistant' },
+    });
+
     // Saldo inicial de ejemplo (entradas sin QR ni canje asociado, se recrean en cada seed).
     await prisma.pointEntry.deleteMany({ where: { userId: cliente.id, claimId: null, rewardId: null } });
     await prisma.pointEntry.createMany({

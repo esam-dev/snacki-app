@@ -114,6 +114,7 @@ Abre http://localhost:4200. La app llama a la API definida en `src/environments/
 |---|---|---|
 | Cliente | `cliente@snacki.demo` | — |
 | Comercio | `comercio@snacki.demo` | Burger House |
+| Sucursal (asistente) | `sucursal@snacki.demo` | Burger House (cambios con aprobación) |
 | Comercio | `heladeria@snacki.demo` | Heladería Polar |
 | Comercio | `cafeteria@snacki.demo` | Café Central |
 | Comercio | `pizzeria@snacki.demo` | Pizzería Napoli |
