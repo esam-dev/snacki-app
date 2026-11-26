@@ -7,6 +7,7 @@ import {
   updateRewardSchema,
   updateMerchantSettingsSchema,
   createQrSchema,
+  createRedeemQrSchema,
 } from './merchant.schemas.js';
 import { merchantService } from './merchant.service.js';
 
@@ -80,6 +81,24 @@ export async function merchantRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     if (!UUID_RE.test(id)) return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'QR no encontrado' } });
     return reply.send({ data: await merchantService.voidQr(request.authUser?.tenantId, id) });
+  });
+
+  // QR de canje: el cliente lo escanea en el local para gastar sus puntos en una recompensa.
+  app.post('/redeem-qr', async (request, reply) => {
+    const qr = await merchantService.createRedeemQr(request.authUser?.tenantId, request.authUser?.sub, createRedeemQrSchema.parse(request.body));
+    return reply.status(201).send({ data: qr });
+  });
+
+  app.get('/redeem-qr/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!UUID_RE.test(id)) return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'QR no encontrado' } });
+    return reply.send({ data: await merchantService.getRedeemQrStatus(request.authUser?.tenantId, id) });
+  });
+
+  app.post('/redeem-qr/:id/void', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!UUID_RE.test(id)) return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'QR no encontrado' } });
+    return reply.send({ data: await merchantService.voidRedeemQr(request.authUser?.tenantId, id) });
   });
 
   // Settings

@@ -138,40 +138,6 @@ describe('StoreService', () => {
     expect(store.movimientos).toHaveLength(0);
   });
 
-  it('canjea con saldo suficiente, descuenta solo ese local y registra un movimiento de canje', () => {
-    const store = crearStore(CLIENTE);
-    const producto = store.getById('burger-house')?.productos[0];
-    expect(producto).toBeDefined();
-
-    const saldosAntes = Object.fromEntries(store.getAll().map((local) => [local.id, local.puntos]));
-
-    expect(store.canjear('burger-house', producto!)).toBe('ok');
-
-    expect(saldo(store, 'burger-house')).toBe(saldosAntes['burger-house']! - producto!.puntos);
-    expect(saldo(store, 'pizza-hut')).toBe(saldosAntes['pizza-hut']!);
-    expect(saldo(store, 'quattro-d')).toBe(saldosAntes['quattro-d']!);
-    expect(saldo(store, 'spaghettoteca')).toBe(saldosAntes['spaghettoteca']!);
-
-    const movimiento = store.movimientos.find((item) => item.tipo === 'canje' && item.localId === 'burger-house');
-    expect(movimiento).toBeDefined();
-    expect(movimiento?.descripcion).toBe(producto!.nombre);
-    expect(movimiento?.puntos).toBe(producto!.puntos);
-  });
-
-  it('rechaza el canje cuando el saldo es insuficiente y no modifica el estado', () => {
-    const store = crearStore(CLIENTE);
-    const producto = store.getById('burger-house')?.productos.find((item) => item.nombre === 'Recompensa costosa');
-    if (!producto) {
-      const comercio = crearStore(COMERCIO_BURGER);
-      expect(comercio.agregarRecompensa('burger-house', 'Recompensa costosa', 9999)).toBe(true);
-    }
-    const cliente = crearStore(CLIENTE);
-    const caro = cliente.getById('burger-house')?.productos.find((item) => item.nombre === 'Recompensa costosa') || { nombre: 'X', puntos: 9999, imagen: 'assets/img/prod-combo-bacon.jpg' };
-    const saldoAntes = saldo(cliente, 'burger-house');
-    expect(cliente.canjear('burger-house', caro as Producto)).toBe('saldo-insuficiente');
-    expect(saldo(cliente, 'burger-house')).toBe(saldoAntes);
-  });
-
   it('permite a un comercio autorizado agregar y eliminar recompensas', () => {
     const comercio = crearStore(COMERCIO_BURGER);
     expect(comercio.agregarRecompensa('burger-house', 'Oferta autorizada', 150)).toBe(true);
@@ -210,12 +176,56 @@ describe('StoreService', () => {
       const local = store.getById('burger-house');
       expect(local?.nombre).toBe('Burger House');
       expect(local?.logo).toBe(`${environment.apiBaseUrl}/api/catalog/images/tenant/t1?v=1`);
-      expect(local?.vencimiento).toBe('2027-03-01');
+      // El vencimiento mostrado es el de los puntos del cliente (wallet); sin puntos, no hay fecha.
+      expect(local?.vencimiento).toBe('');
       expect(local?.promos.map((p) => p.nombre)).toEqual(['Combo nuevo']);
       expect(local?.productos.map((p) => p.nombre)).toEqual(['Papas gratis']);
       expect(local?.productos[0]?.imagen).toBe(`${environment.apiBaseUrl}/api/catalog/images/reward/r1?v=2`);
-      expect(local?.puntos).toBe(1250); // saldo de demostración conservado
+      // Con catálogo real el saldo sale de la wallet del servidor: sin wallet aún, 0 (nunca el de demostración).
+      expect(local?.puntos).toBe(0);
       expect(store.getById('pizza-hut')).toBeUndefined(); // ya no está en el catálogo del servidor
+    });
+
+    it('con wallet del servidor muestra saldo, vencimiento, progreso y movimientos reales', async () => {
+      const store = crearStore(CLIENTE);
+      const httpMock = TestBed.inject(HttpTestingController);
+
+      const promesa = store.refrescar();
+      httpMock.expectOne(URL_CATALOGO).flush({
+        data: { tenants: [
+          { id: 't1', slug: 'burger-house', name: 'Burger House', category: 'comida_rapida', address: null, logoUrl: null, pointsExpireAt: null, products: [], rewards: [{ id: 'r1', name: 'Papas gratis', description: null, cost: 600, imageUrl: null }] },
+          { id: 't2', slug: 'cafe-central', name: 'Café Central', category: 'cafe', address: null, logoUrl: null, pointsExpireAt: null, products: [], rewards: [] },
+        ] },
+      });
+      httpMock.expectOne(`${environment.apiBaseUrl}/api/wallet`).flush({
+        data: {
+          totalPoints: 450,
+          updatedAt: '2026-11-25T12:00:00.000Z',
+          tenants: [{
+            tenantId: 't1', slug: 'burger-house', name: 'Burger House', balance: 450,
+            nextExpiresAt: '2027-01-24T00:00:00.000Z', nextExpiringPoints: 450, redeemableRewards: 0,
+            nextReward: { id: 'r1', name: 'Papas gratis', cost: 600, missing: 150, progress: 0.75 },
+          }],
+        },
+      });
+      httpMock.expectOne(`${environment.apiBaseUrl}/api/wallet/movements`).flush({
+        data: { movements: [
+          { id: 'm1', tenantSlug: 'burger-house', tenantName: 'Burger House', type: 'EARN', points: 450, description: 'Combo', createdAt: '2026-11-25T10:00:00.000Z', expired: false },
+          { id: 'm2', tenantSlug: 'cafe-central', tenantName: 'Café Central', type: 'EARN', points: 300, description: 'Puntos acumulados', createdAt: '2026-10-01T10:00:00.000Z', expired: true },
+        ] },
+      });
+      await promesa;
+
+      expect(store.usaWallet).toBe(true);
+      const burger = store.getById('burger-house');
+      expect(burger?.puntos).toBe(450);
+      expect(burger?.vencimiento).toBe('2027-01-24');
+      expect(burger?.siguienteRecompensa).toMatchObject({ nombre: 'Papas gratis', faltan: 150, progreso: 0.75 });
+      expect(store.getById('cafe-central')?.puntos).toBe(0);
+      expect(store.totalPuntos).toBe(450);
+      expect(store.movimientos.map((m) => m.id)).toEqual(['m1', 'm2']);
+      expect(store.movimientos[1]?.vencido).toBe(true);
+      httpMock.verify();
     });
 
     it('si el servidor falla se mantiene el último catálogo conocido', async () => {

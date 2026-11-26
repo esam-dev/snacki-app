@@ -1,8 +1,9 @@
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../common/errors/app-error.js';
-import { QR_URI_PREFIX, signQrToken } from '../../lib/qr-token.js';
+import { QR_URI_PREFIX, REDEEM_URI_PREFIX, signQrToken, signRedeemToken } from '../../lib/qr-token.js';
 import type {
   CreateQrInput,
+  CreateRedeemQrInput,
   CreateProductInput,
   UpdateProductInput,
   CreateRewardInput,
@@ -17,6 +18,8 @@ function requireTenantId(tenantId: string | undefined): string {
 
 /** Vigencia del QR: 24 h para que el cliente pueda escanear sin conexión y sincronizar después. */
 export const QR_TTL_MS = 24 * 60 * 60 * 1000;
+/** Vigencia del QR de canje: corta, porque el cliente lo escanea frente al comercio. */
+export const REDEEM_QR_TTL_MS = 10 * 60 * 1000;
 
 export const merchantService = {
   // QR de compra
@@ -87,6 +90,67 @@ export const merchantService = {
     return { claimId: claim.id, status, claimedAt: claim.claimedAt, expiresAt: claim.expiresAt };
   },
 
+  // QR de canje de recompensa
+  async createRedeemQr(tenantId: string | undefined, userId: string | undefined, input: CreateRedeemQrInput) {
+    const tid = requireTenantId(tenantId);
+    if (!userId) throw new AppError(401, 'UNAUTHORIZED', 'No autenticado');
+
+    const reward = await prisma.reward.findFirst({ where: { id: input.rewardId, tenantId: tid, deletedAt: null } });
+    if (!reward) throw new AppError(404, 'NOT_FOUND', 'Recompensa no encontrada');
+    if (!reward.isActive) throw new AppError(409, 'REWARD_INACTIVE', 'La recompensa está pausada. Actívala para generar el QR de canje.');
+
+    const expiresAt = new Date(Date.now() + REDEEM_QR_TTL_MS);
+    const qr = await prisma.redemptionClaim.create({
+      data: { tenantId: tid, rewardId: reward.id, cost: reward.cost, expiresAt, createdById: userId },
+    });
+    const token = signRedeemToken(qr.id, expiresAt);
+    return {
+      qrId: qr.id,
+      token,
+      qrContent: `${REDEEM_URI_PREFIX}${token}`,
+      expiresAt: qr.expiresAt,
+      cost: qr.cost,
+      reward: { id: reward.id, name: reward.name, cost: reward.cost },
+    };
+  },
+
+  /** Estado del QR de canje; si ya se canjeó, incluye a quién entregarle la recompensa. */
+  async getRedeemQrStatus(tenantId: string | undefined, qrId: string) {
+    const tid = requireTenantId(tenantId);
+    const qr = await prisma.redemptionClaim.findFirst({
+      where: { id: qrId, tenantId: tid },
+      select: {
+        id: true, claimedAt: true, expiresAt: true,
+        claimedBy: { select: { fullName: true } },
+        redemption: { select: { code: true } },
+      },
+    });
+    if (!qr) throw new AppError(404, 'NOT_FOUND', 'QR no encontrado');
+    const status = qr.claimedAt ? 'claimed' : qr.expiresAt < new Date() ? 'expired' : 'pending';
+    return {
+      qrId: qr.id,
+      status,
+      claimedAt: qr.claimedAt,
+      expiresAt: qr.expiresAt,
+      customerName: qr.claimedBy?.fullName ?? null,
+      code: qr.redemption?.code ?? null,
+    };
+  },
+
+  /** Anula un QR de canje que todavía no se usó. Atómico frente a un escaneo simultáneo. */
+  async voidRedeemQr(tenantId: string | undefined, qrId: string) {
+    const tid = requireTenantId(tenantId);
+    const now = new Date();
+    const res = await prisma.redemptionClaim.updateMany({
+      where: { id: qrId, tenantId: tid, claimedAt: null, expiresAt: { gt: now } },
+      data: { expiresAt: now },
+    });
+    if (res.count === 1) return { qrId, status: 'expired' as const };
+    const qr = await prisma.redemptionClaim.findFirst({ where: { id: qrId, tenantId: tid }, select: { claimedAt: true } });
+    if (!qr) throw new AppError(404, 'NOT_FOUND', 'QR no encontrado');
+    if (qr.claimedAt) throw new AppError(409, 'QR_ALREADY_USED', 'El cliente ya canjeó esta recompensa.');
+    return { qrId, status: 'expired' as const };
+  },
 
   // Products (promos)
   async listProducts(tenantId?: string) {

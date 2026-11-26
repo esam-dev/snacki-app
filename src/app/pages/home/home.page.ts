@@ -55,7 +55,7 @@ export class HomePage implements OnInit {
 
   ionViewWillEnter() {
     this.cargarDatos();
-    void this.stores.refrescarCatalogo(3000);
+    void this.stores.refrescar(3000);
   }
 
   filtrar(event: Event) {

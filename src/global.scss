@@ -101,12 +101,24 @@ ion-button.snacki-btn.small {
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.28);
 }
 
-/* Cuadrícula de tarjetas (locales / productos) */
+/* Cuadrícula de tarjetas (locales / productos): 2 columnas en el celular y más a medida que crece la pantalla. */
 .item-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr));
   gap: 14px;
   margin-top: 16px;
+
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 18px;
+  }
+}
+
+/* Ancho máximo del contenido en tablet / escritorio, centrado. */
+.snacki-wrap {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
 }
 .item-card {
   @extend .snacki-card;

@@ -125,6 +125,12 @@ export class ComercioPage {
   generandoQr = false;
   anulandoQr = false;
   qrAnulado = false;
+  /** `venta`: el cliente suma puntos. `canje`: el cliente gasta puntos en una recompensa. */
+  qrTipo: 'venta' | 'canje' = 'venta';
+  private qrRewardId = '';
+  /** Al canjearse: a quién entregar la recompensa y el código del canje. */
+  qrCliente: string | null = null;
+  qrCodigo: string | null = null;
   private qrTimer: ReturnType<typeof setInterval> | null = null;
 
   get promosParaQr(): MerchantProduct[] {
@@ -325,10 +331,49 @@ export class ComercioPage {
       return;
     }
     const elegida = p && activas.some((a) => a.id === p.id) ? p : activas[0];
+    this.qrTipo = 'venta';
     this.qrProductId = elegida.id;
     this.qrCantidad = 1;
     this.limpiarQr();
     this.modal = 'qr';
+  }
+
+  /** QR de canje: el cliente lo escanea en el local y recién ahí se descuentan sus puntos. */
+  async abrirQrCanje(r: MerchantReward) {
+    if (!r.isActive) {
+      await this.mostrar('Activa la recompensa para generar su QR de canje.', 'info');
+      return;
+    }
+    this.qrTipo = 'canje';
+    this.qrRewardId = r.id;
+    this.limpiarQr();
+    this.modal = 'qr';
+    await this.generarQrCanje();
+  }
+
+  private async generarQrCanje() {
+    if (this.generandoQr || !this.qrRewardId) return;
+    this.generandoQr = true;
+    this.cdr.markForCheck();
+    try {
+      await this.mostrarQrGenerado(await this.merchant.createRedeemQr(this.qrRewardId));
+    } catch (e: any) {
+      await this.mostrarError(e, 'No se pudo generar el QR de canje.');
+      if (e?.status === 409) await this.loadAll();
+      this.cerrarModal();
+    } finally {
+      this.generandoQr = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  private async mostrarQrGenerado(qr: MerchantQr) {
+    this.qrImage = await this.dibujarQrConLogo(qr.qrContent);
+    this.qrResult = qr;
+    this.qrStatus = 'pending';
+    this.actualizarRestante();
+    this.iniciarSeguimientoQr();
+    playSuccessChime();
   }
 
   cambiarCantidadQr(delta: number) {
@@ -340,13 +385,7 @@ export class ComercioPage {
     this.generandoQr = true;
     this.cdr.markForCheck();
     try {
-      const qr = await this.merchant.createQr(this.qrProductId, this.qrCantidad);
-      this.qrImage = await this.dibujarQrConLogo(qr.qrContent);
-      this.qrResult = qr;
-      this.qrStatus = 'pending';
-      this.actualizarRestante();
-      this.iniciarSeguimientoQr();
-      playSuccessChime();
+      await this.mostrarQrGenerado(await this.merchant.createQr(this.qrProductId, this.qrCantidad));
     } catch (e: any) {
       await this.mostrarError(e, 'No se pudo generar el QR.');
       // La promo pudo cambiar de estado (pausada / terminada): refresca la lista.
@@ -360,18 +399,24 @@ export class ComercioPage {
   /** Vuelve al formulario para emitir otro QR (la venta anterior sigue válida si no se escaneó). */
   nuevoQr() {
     this.limpiarQr();
+    if (this.qrTipo === 'canje') void this.generarQrCanje();
   }
 
   /** Invalida el QR mostrado (venta cancelada o generado por error) para que nadie pueda usarlo. */
   async anularQr() {
     const claimId = this.qrResult?.claimId;
     if (!claimId || this.anulandoQr || this.qrStatus !== 'pending') return;
-    const ok = await this.confirmar('Anular QR', 'El cliente ya no podrá sumar puntos con este código. ¿Continuar?', 'Anular');
+    const canje = this.qrTipo === 'canje';
+    const ok = await this.confirmar(
+      'Anular QR',
+      canje ? 'El cliente ya no podrá canjear con este código. ¿Continuar?' : 'El cliente ya no podrá sumar puntos con este código. ¿Continuar?',
+      'Anular',
+    );
     if (!ok || this.qrResult?.claimId !== claimId) return;
     this.anulandoQr = true;
     this.cdr.markForCheck();
     try {
-      await this.merchant.voidQr(claimId);
+      await (canje ? this.merchant.voidRedeemQr(claimId) : this.merchant.voidQr(claimId));
       this.qrStatus = 'expired';
       this.qrAnulado = true;
       this.detenerSeguimientoQr();
@@ -431,13 +476,21 @@ export class ComercioPage {
     if (!claimId) return;
     this.actualizarRestante();
     try {
-      const { status } = await this.merchant.getQrStatus(claimId);
+      const canje = this.qrTipo === 'canje';
+      const res = canje ? await this.merchant.getRedeemQrStatus(claimId) : await this.merchant.getQrStatus(claimId);
       if (this.qrResult?.claimId !== claimId) return; // se generó otro mientras tanto
       const antes = this.qrStatus;
-      this.qrStatus = status;
-      if (status !== 'pending') this.detenerSeguimientoQr();
-      if (antes === 'pending' && status === 'claimed') {
-        await this.mostrar(`¡Listo! El cliente sumó ${this.qrResult?.points ?? 0} puntos.`, 'ok');
+      this.qrStatus = res.status;
+      if ('customerName' in res) {
+        this.qrCliente = res.customerName;
+        this.qrCodigo = res.code;
+      }
+      if (res.status !== 'pending') this.detenerSeguimientoQr();
+      if (antes === 'pending' && res.status === 'claimed') {
+        const msg = canje
+          ? `¡Canje confirmado! Entrega ${this.qrResult?.product.name ?? 'la recompensa'}${this.qrCliente ? ` a ${this.qrCliente}` : ''}.`
+          : `¡Listo! El cliente sumó ${this.qrResult?.points ?? 0} puntos.`;
+        await this.mostrar(msg, 'ok');
       }
     } catch {
       // Sin red momentánea: se reintenta en el próximo ciclo.
@@ -467,6 +520,8 @@ export class ComercioPage {
     this.qrStatus = 'pending';
     this.qrRestante = '';
     this.qrAnulado = false;
+    this.qrCliente = null;
+    this.qrCodigo = null;
   }
 
   ionViewWillLeave() {
