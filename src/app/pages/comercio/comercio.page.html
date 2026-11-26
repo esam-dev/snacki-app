@@ -21,9 +21,11 @@
       <button class="icon-btn" type="button" [class.has-dot]="!tieneUbicacion" [attr.aria-label]="tieneUbicacion ? 'Ver ubicación en el mapa' : 'Agregar ubicación'" [title]="tieneUbicacion ? 'Ver ubicación en el mapa' : 'Agregar ubicación'" (click)="abrirMapa()">
         <app-icon name="map" />
       </button>
-      <button class="icon-btn" type="button" aria-label="Configuración" title="Configuración" (click)="abrirSettings()">
-        <app-icon name="settings" />
-      </button>
+      @if (!esAsistente) {
+        <button class="icon-btn" type="button" aria-label="Configuración" title="Configuración" (click)="abrirSettings()">
+          <app-icon name="settings" />
+        </button>
+      }
       <button class="icon-btn" type="button" aria-label="Cerrar sesión" title="Cerrar sesión" (click)="cerrarSesion()">
         <app-icon name="log-out" />
       </button>
@@ -75,7 +77,7 @@
     </section>
 
     <!-- Configuración inicial (si falta algo) -->
-    @if (setupProgress < 100) {
+    @if (setupProgress < 100 && !esAsistente) {
       <section class="panel setup-card">
         <div class="setup-head">
           <div>
@@ -110,7 +112,19 @@
       <button type="button" [class.active]="section === 'recompensas'" (click)="setSection('recompensas')">
         <app-icon name="gift" /> Recompensas <span class="tab-count">{{ rewards.length }}</span>
       </button>
+      <button type="button" [class.active]="section === 'solicitudes'" (click)="setSection('solicitudes')">
+        <app-icon name="clock" /> {{ esAsistente ? 'Mis cambios' : 'Solicitudes' }} @if (pendientesCambios > 0) { <span class="tab-count">{{ pendientesCambios }}</span> }
+      </button>
     </nav>
+
+    @if (section === 'solicitudes') {
+      <app-solicitudes-cambio
+        [puedeRevisar]="!esAsistente"
+        (pendientes)="pendientesCambios = $event"
+        (aplicado)="loadAll()"
+        (aviso)="mostrar($event.texto, $event.tipo)"
+      />
+    }
 
     <div class="dash-columns" [class.single]="section !== 'inicio'">
     <!-- Promos -->
@@ -390,15 +404,18 @@
           <app-icon name="locate" /> Usar mi ubicación
         </button>
         <div class="map-frame map-preview">
-          @if (settingsMapUrl) {
-            <iframe [src]="settingsMapUrl" title="Vista previa de la ubicación" loading="lazy"></iframe>
-          } @else {
-            <div class="map-empty">
-              <app-icon name="map" />
-              <span>Ingresa latitud y longitud o usa tu ubicación para ver el mapa.</span>
-            </div>
-          }
+          <app-snacki-map
+            [centro]="settingsCentro"
+            [zoom]="settingsZoom"
+            [pin]="settingsPunto"
+            [seleccionable]="true"
+            (puntoElegido)="elegirPunto($event)"
+          />
         </div>
+        <p class="map-hint">
+          @if (settingsPunto) { Toca el mapa para mover el pin; las coordenadas se actualizan solas. }
+          @else { Toca el mapa para fijar la ubicación de tu tienda, o usa tu ubicación actual. }
+        </p>
         <label class="field-label">Puntos expiran el</label>
         <input class="field-input" type="date" [(ngModel)]="settingsPointsExpireAt" />
       </ion-content>
@@ -524,8 +541,8 @@
       </ion-header>
       <ion-content class="modal-body">
         <div class="map-frame">
-          @if (mapEmbedUrl) {
-            <iframe [src]="mapEmbedUrl" title="Mapa de la ubicación de la tienda" loading="lazy"></iframe>
+          @if (mapaPunto) {
+            <app-snacki-map [centro]="mapaPunto" [zoom]="16" [pin]="mapaPunto" />
           }
         </div>
         <div class="map-info">
@@ -536,7 +553,7 @@
           </div>
         </div>
         <a class="btn btn-secondary map-link" [href]="googleMapsUrl" target="_blank" rel="noopener">
-          <app-icon name="external-link" /> Abrir en Google Maps
+          <app-icon name="external-link" /> Cómo llegar en Google Maps
         </a>
       </ion-content>
       <ion-footer class="modal-footer">

@@ -15,19 +15,40 @@
       <ion-button class="snacki-btn small-pill" shape="round" size="small" type="button" (click)="agregarFoto()">Agregar una Foto</ion-button>
     </div>
 
-    <label class="snacki-label">{{ tipoCuenta === 'comercio' ? 'Nombre del comercio:' : 'Nombre de Usuario:' }}</label>
-    <ion-input class="snacki-input" name="nombre" autocomplete="name" [attr.aria-label]="tipoCuenta === 'comercio' ? 'Nombre del comercio' : 'Nombre de Usuario'" [placeholder]="tipoCuenta === 'comercio' ? 'Nombre comercial' : 'Agregar Nombre y Apellido.'" [(ngModel)]="form.nombre"></ion-input>
+    @if (tipoCuenta === 'comercio') {
+      <div class="register-tabs" role="tablist" aria-label="Tipo de registro de comercio">
+        <button type="button" role="tab" [class.active]="modoComercio === 'nuevo'" [attr.aria-selected]="modoComercio === 'nuevo'" (click)="modoComercio = 'nuevo'">Local nuevo</button>
+        <button type="button" role="tab" [class.active]="modoComercio === 'sucursal'" [attr.aria-selected]="modoComercio === 'sucursal'" (click)="modoComercio = 'sucursal'">Sucursal</button>
+      </div>
+      <p class="snacki-hint tab-hint">
+        @if (modoComercio === 'nuevo') { Creas tu local y esta cuenta será la principal: aprueba los cambios de sus sucursales. }
+        @else { Te unes a un local existente como asistente: tus promos y recompensas las aprueba la cuenta principal antes de publicarse. }
+      </p>
+    }
+
+    <label class="snacki-label">{{ tipoCuenta === 'comercio' ? 'Nombre del responsable:' : 'Nombre de Usuario:' }}</label>
+    <ion-input class="snacki-input" name="nombre" autocomplete="name" [attr.aria-label]="tipoCuenta === 'comercio' ? 'Nombre del responsable' : 'Nombre de Usuario'" [placeholder]="tipoCuenta === 'comercio' ? 'Nombre y apellido' : 'Agregar Nombre y Apellido.'" [(ngModel)]="form.nombre"></ion-input>
 
     @if (tipoCuenta === 'cliente') {
       <label class="snacki-label">Edad:</label>
       <ion-input class="snacki-input" name="edad" type="number" inputmode="numeric" min="18" max="120" step="1" aria-label="Edad" placeholder="Debes tener 18 años o más" [(ngModel)]="form.edad"></ion-input>
+    } @else if (modoComercio === 'nuevo') {
+      <label class="snacki-label">Nombre del local:</label>
+      <ion-input class="snacki-input" name="nombreLocal" aria-label="Nombre del local" placeholder="Nombre comercial" [(ngModel)]="form.nombreLocal"></ion-input>
+      <label class="snacki-label">Categoría:</label>
+      <ion-select class="snacki-input" name="categoria" aria-label="Categoría del local" [(ngModel)]="form.categoria">
+        @for (c of categorias; track c.id) { <ion-select-option [value]="c.id">{{ c.nombre }}</ion-select-option> }
+      </ion-select>
     } @else {
       <label class="snacki-label">Comercio asociado:</label>
-      <ion-select class="snacki-input" name="comercioId" aria-label="Comercio asociado" [placeholder]="cargandoLocales ? 'Cargando comercios...' : 'Selecciona tu comercio'" [(ngModel)]="form.comercioId" [disabled]="cargandoLocales">
+      <ion-select class="snacki-input" name="comercioId" aria-label="Comercio asociado" [placeholder]="cargandoLocales ? 'Cargando comercios...' : 'Elige el local principal'" [(ngModel)]="form.comercioId" [disabled]="cargandoLocales">
         @for (local of locales; track local.id) { <ion-select-option [value]="local.id">{{ local.name }}</ion-select-option> }
       </ion-select>
       @if (!cargandoLocales && locales.length === 0) {
-        <p class="snacki-hint">No hay comercios disponibles. Verifica que el backend esté activo.</p>
+        <p class="snacki-hint">No hay comercios disponibles. Verifica que el backend esté activo o registra un local nuevo.</p>
+      }
+      @if (nombreSucursal) {
+        <p class="snacki-hint">Serás asistente de {{ nombreSucursal }}.</p>
       }
     }
 

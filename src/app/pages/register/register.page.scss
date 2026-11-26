@@ -12,3 +12,8 @@
 .register-switch button.active { border-color: var(--ion-color-primary); background: #f3f7ff; color: var(--ion-color-primary); }
 
 /* Campo con botón de mostrar/ocultar: patrón global .with-icon/.eye */
+
+.register-tabs { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 2px solid #e3e5eb; margin: 0 0 6px; }
+.register-tabs button { min-height: 38px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -2px; background: transparent; color: #6b7080; font-size: 14px; font-weight: 600; }
+.register-tabs button.active { border-bottom-color: var(--ion-color-primary); color: var(--ion-color-primary); }
+.tab-hint { margin: 0 0 12px; }

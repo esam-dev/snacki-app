@@ -60,10 +60,25 @@ export class AuthService {
     } catch (err) { return this.mapError(err, 'No se pudo iniciar sesión.'); }
   }
 
-  async register(nombre: string, correo: string, password: string, tipo: TipoCuenta = 'cliente', comercioId?: string): Promise<AuthActionResult> {
-    const payload: RegisterPayload = { fullName: nombre.trim(), email: correo.trim().toLowerCase(), password, accountType: tipo, tenantId: tipo === 'comercio' ? (comercioId || null) : null };
+  /**
+   * Comercio: con `localNuevo` se crea un local propio (titular); con `comercioId` se registra como sucursal
+   * (asistente) de ese comercio.
+   */
+  async register(nombre: string, correo: string, password: string, tipo: TipoCuenta = 'cliente', comercioId?: string, localNuevo?: { nombre: string; categoria?: string }): Promise<AuthActionResult> {
+    const payload: RegisterPayload = { fullName: nombre.trim(), email: correo.trim().toLowerCase(), password, accountType: tipo, tenantId: null };
+    if (tipo === 'comercio') {
+      if (localNuevo) {
+        payload.businessMode = 'new';
+        payload.tenantName = localNuevo.nombre.trim();
+        if (localNuevo.categoria) payload.category = localNuevo.categoria;
+      } else {
+        payload.businessMode = 'branch';
+        payload.tenantId = comercioId || null;
+      }
+    }
     if (!payload.fullName || !payload.email || !payload.password.trim()) return { success: false, message: 'Completa todos los campos obligatorios.' };
-    if (tipo === 'comercio' && !payload.tenantId) return { success: false, message: 'Selecciona el comercio asociado.' };
+    if (payload.businessMode === 'new' && !payload.tenantName) return { success: false, message: 'Escribe el nombre de tu local.' };
+    if (payload.businessMode === 'branch' && !payload.tenantId) return { success: false, message: 'Selecciona el comercio asociado.' };
     try {
       const res = await firstValueFrom(this.http.post<ApiResponse<AuthSessionData>>(`${environment.apiBaseUrl}/api/auth/register`, payload).pipe(timeout(AUTH_REQUEST_TIMEOUT_MS)));
       await this.applySession(res.data);
@@ -94,6 +109,7 @@ export class AuthService {
     return {
       id: user.id, fullName: user.fullName, email: user.email, role: membership.role,
       tenantId: membership.tenantId, tenantSlug: membership.tenantSlug, tenantName: membership.tenantName,
+      ...(membership.role === 'comercio' ? { staffRole: membership.staffRole ?? 'owner' } : {}),
       nombre: user.fullName, correo: user.email, tipo: membership.role, ...(comercioId ? { comercioId } : {}),
     };
   }
