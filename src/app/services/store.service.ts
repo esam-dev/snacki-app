@@ -36,6 +36,8 @@ export interface Local {
   promos: Promo[];
   categoria?: string;
   direccion?: string;
+  latitud?: number | null;
+  longitud?: number | null;
   /** Datos de la wallet del servidor (solo con sesión de cliente y catálogo del servidor). */
   siguienteRecompensa?: WalletComercio['siguiente'];
   puntosPorVencer?: number;
@@ -49,6 +51,7 @@ interface ApiPromo {
 interface ApiReward { id: string; name: string; description: string | null; cost: number; imageUrl: string | null; }
 interface ApiTenant {
   id: string; slug: string; name: string; category: string; address: string | null;
+  latitude?: number | null; longitude?: number | null;
   logoUrl: string | null; pointsExpireAt: string | null; products: ApiPromo[]; rewards: ApiReward[];
 }
 
@@ -463,6 +466,8 @@ export class StoreService {
       vencimiento: tenant.pointsExpireAt ? tenant.pointsExpireAt.slice(0, 10) : '',
       categoria: tenant.category,
       direccion: tenant.address ?? undefined,
+      latitud: tenant.latitude ?? null,
+      longitud: tenant.longitude ?? null,
       productos: (tenant.rewards ?? []).map((reward) => ({
         id: reward.id,
         nombre: reward.name,
