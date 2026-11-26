@@ -122,6 +122,32 @@ export class MerchantService {
     await firstValueFrom(this.http.post(`${this.base}/qr/${claimId}/void`, {}));
   }
 
+  // QR de canje: el cliente lo escanea en el local para gastar sus puntos en la recompensa.
+  /** Se devuelve con la misma forma que el QR de venta para reutilizar la pantalla del QR. */
+  async createRedeemQr(rewardId: string): Promise<MerchantQr> {
+    const res = await firstValueFrom(
+      this.http.post<{ data: { qrId: string; token: string; qrContent: string; expiresAt: string; cost: number; reward: { id: string; name: string; cost: number } } }>(
+        `${this.base}/redeem-qr`, { rewardId },
+      ),
+    );
+    const d = res.data;
+    return {
+      claimId: d.qrId, token: d.token, qrContent: d.qrContent, expiresAt: d.expiresAt,
+      points: d.cost, quantity: 1, product: { id: d.reward.id, name: d.reward.name, points: d.cost },
+    };
+  }
+
+  async getRedeemQrStatus(qrId: string): Promise<{ status: MerchantQrStatus; customerName: string | null; code: string | null }> {
+    const res = await firstValueFrom(
+      this.http.get<{ data: { status: MerchantQrStatus; customerName: string | null; code: string | null } }>(`${this.base}/redeem-qr/${qrId}`),
+    );
+    return res.data;
+  }
+
+  async voidRedeemQr(qrId: string): Promise<void> {
+    await firstValueFrom(this.http.post(`${this.base}/redeem-qr/${qrId}/void`, {}));
+  }
+
   // Settings
   async getSettings(): Promise<MerchantSettings> {
     const res = await firstValueFrom(this.http.get<{ data: { settings: MerchantSettings } }>(`${this.base}/settings`));
