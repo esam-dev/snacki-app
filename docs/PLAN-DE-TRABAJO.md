@@ -29,8 +29,8 @@ Roles:
 | Pantallas Ionic (login, registro, home, explorar, tienda, QR, puntos, perfil, comercio) | Conectar puntos/canje del cliente al backend (hoy simulados en `localStorage` / `store.service.ts`); el catálogo ya viene del backend |
 | Auth contra backend (`/auth/*`, `/tenants`, JWT + interceptor) | Integrar `POST /api/claims` en la app del cliente |
 | Esquema Prisma + seed de comercios gastronómicos (`feat/db-schema-seed`, PR #6) | Modelo `Referral` + reglas de bono en `Tenant` (`feat/referrals-engine`) |
-| API comercio: promos, recompensas (con foto) y settings + panel comercio responsive con mapa del local (`feat/merchant-catalog`, PR #7) | Wallet, canjes, stats, referidos, comercios cercanos para el cliente |
-| Catálogo del cliente desde la API: `/catalog/*` (promos vigentes, recompensas, logo e imágenes; se refresca al entrar, al volver a la app y cada 60 s) (PR #10) | SQLite offline + sincronización, mapa, push, deploy Railway, build Android, pulido UX, informe |
+| API comercio: promos, recompensas (con foto) y settings + panel comercio responsive con mapa del local (`feat/merchant-catalog`, PR #7) | Wallet, canjes, stats, referidos |
+| Catálogo del cliente desde la API: `/catalog/*` (promos vigentes, recompensas, logo e imágenes; se refresca al entrar, al volver a la app y cada 60 s) (PR #10). Mapa interactivo (OpenStreetMap) para fijar la ubicación del local, mapa en la tienda y comercios cercanos ordenados por distancia en Explorar (`feat/geolocation-map`) | SQLite offline + sincronización, push, deploy Railway, build Android, pulido UX, informe |
 | QR firmado generado por el comercio + `POST /api/claims` atómico, una vez por QR (`feat/merchant-qr`) | |
 | Escáner QR (`@capacitor-mlkit/barcode-scanning`); `@capacitor-community/sqlite` instalado sin usar | |
 
@@ -39,7 +39,7 @@ Roles:
 App Ionic/Angular (Capacitor)
  ├─ SQLite local  ── caché de saldos/promos/recompensas/comercios + cola pending_ops
  ├─ SyncService   ── @capacitor/network: al volver la conexión envía la cola y refresca la caché
- ├─ Geolocation   ── @capacitor/geolocation → comercios cercanos en mapa (Leaflet + OpenStreetMap)
+ ├─ Geolocation   ── @capacitor/geolocation → comercios cercanos en mapa (componente propio sobre teselas OpenStreetMap)
  └─ Push          ── recibe notificaciones (Firebase Cloud Messaging)
         │ HTTPS + JWT
 Backend Fastify + Prisma (Railway) ── Postgres (Railway) = fuente de verdad
@@ -90,6 +90,7 @@ Sincronización (`SyncService`):
 **Comercio** (rol `comercio`, solo su tenant)
 - `GET/POST/PATCH/DELETE /api/merchant/products` (acepta `imageUrl`: foto PNG/JPG/WebP como data URL, URL o ruta de assets; si la promo ya tiene ventas se archiva en vez de borrarse) (hecho)
 - `GET/POST/PATCH/DELETE /api/merchant/rewards` (igual, con `imageUrl`; se archiva si ya tiene canjes) (hecho)
+- **Sucursales y aprobaciones** ✅: el registro de comercio tiene dos pestañas. *Local nuevo* crea el comercio y deja la cuenta como **titular** (`staffRole = owner`); *Sucursal* se une a un comercio existente como **asistente** (`assistant`). Cuando un asistente crea, edita o elimina una promo o recompensa, el API no lo aplica: guarda un `ChangeRequest` (datos ya validados) y responde `202 {pending: true}`. Los titulares lo revisan en `GET /api/merchant/change-requests` y lo resuelven con `POST /change-requests/:id/approve` (aplica el cambio una sola vez) o `/reject` (motivo opcional); el asistente ve solo sus solicitudes. Los asistentes tampoco pueden editar los settings del local (`403 OWNER_ONLY`). Pendiente de definir: notificar al asistente cuando se resuelve y poder cancelar una solicitud propia.
 - `PATCH /api/merchant/settings` (`pointsExpireAt`, dirección, lat/lng, categoría, logo, **reglas de referidos**) (hecho: base; pendiente: referidos)
 - `POST /api/merchant/qr` `{productId, quantity}` → `{claimId, token, qrContent, expiresAt, points}` (token compacto `S1.<claimId>.<exp>.<HMAC-SHA256>` firmado con `QR_SECRET`; el QR codifica `snacki://claim/<token>` con el logo de Snacki al centro) (hecho)
 - `GET /api/merchant/qr/:id` → `pending | claimed | expired` (la pantalla del QR muestra "escaneado") (hecho)
@@ -119,7 +120,7 @@ Sincronización (`SyncService`):
 | SQLite | `@capacitor-community/sqlite` (ya instalado) + `jeep-sqlite` para web |
 | Conexión | `@capacitor/network` |
 | Ubicación | `@capacitor/geolocation` |
-| Mapa | `leaflet` + OpenStreetMap (gratis, sin API key) |
+| Mapa | Componente propio `app-snacki-map` + teselas OpenStreetMap (gratis, sin API key ni dependencias) |
 | Push | `@capacitor/push-notifications` + Firebase Cloud Messaging; backend `firebase-admin` |
 | Generar QR | `qrcode` |
 | Escanear QR | `@capacitor-mlkit/barcode-scanning` (ya instalado) |
@@ -134,6 +135,7 @@ Todas salen de `develop` y vuelven por PR a `develop` (revisa la otra persona). 
 |---|---|---|---|
 | `feat/db-schema-seed` | A + B | Migración Prisma con los modelos de §4 + seed (4 comercios con coordenadas, promos, recompensas; usuarios demo) | Hecho (PR #6) |
 | `feat/merchant-catalog` | A | CRUD promos y recompensas + settings (back + panel comercio) | Hecho (PR #7) |
+| `feat/branch-approvals` | A | Registro con pestañas (local nuevo / sucursal), rol titular-asistente y aprobación de cambios de promos y recompensas | Hecho (pendiente de probar) |
 | `chore/deploy-railway` | B | API + Postgres en Railway, `/health` responde, variables `JWT_SECRET`, `QR_SECRET`, `DATABASE_URL`, `CORS_ORIGINS`, Firebase | En curso |
 | `feat/merchant-qr` | A | Comercio genera QR de una promo vigente y lo muestra en pantalla | Hecho (falta PR) |
 | `feat/client-claims-wallet` | B | Escanear → `POST /claims` → saldo; wallet por comercio con progreso a recompensa y vencimientos; movimientos; canje de recompensas solo con QR del comercio | Hecho (PR) |
@@ -141,7 +143,7 @@ Todas salen de `develop` y vuelven por PR a `develop` (revisa la otra persona). 
 | `feat/merchant-redemptions-stats` | A | Lista de canjes, marcar entregado, estadísticas con métricas de recompra y referidos | Pendiente |
 | `feat/client-redemptions` | B | Canjear recompensa con código; errores de saldo insuficiente y sin red | Cubierto por `feat/client-claims-wallet` (canje con QR) |
 | `feat/offline-sqlite-sync` | B | SQLite local, cola `pending_ops`, `SyncService`, indicador "sin conexión / por confirmar" | Pendiente |
-| `feat/geolocation-map` | A | Mapa de comercios cercanos en Explorar (la ubicación del local ya está en settings) | Parcial |
+| `feat/geolocation-map` | A | Mapa de comercios cercanos en Explorar, ubicación del local elegible en el mapa y mapa en la tienda | Hecho (pendiente de probar) |
 | `feat/push-notifications` | A | Registro de token, panel para enviar notificación, cliente la recibe en Android; aviso de vencimiento de puntos (opcional) | Pendiente |
 | `chore/android-build` | B | `npx cap add android`, permisos, APK apuntando a Railway | Pendiente |
 | `fix/polish-ux-details` | A + B | Ver §9 | Pendiente |
