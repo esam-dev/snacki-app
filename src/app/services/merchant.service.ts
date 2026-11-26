@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { environment } from '../../environments/environment';
+import { AppConfigService } from './app-config.service';
 
 export interface MerchantProduct {
   id: string;
@@ -58,7 +58,11 @@ export type MerchantQrStatus = 'pending' | 'claimed' | 'expired';
 @Injectable({ providedIn: 'root' })
 export class MerchantService {
   private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiBaseUrl}/api/merchant`;
+  private readonly config = inject(AppConfigService);
+
+  private get base(): string {
+    return `${this.config.apiBaseUrl}/api/merchant`;
+  }
 
   // Products
   async listProducts(): Promise<MerchantProduct[]> {
