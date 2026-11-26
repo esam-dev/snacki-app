@@ -12,6 +12,29 @@ enum UserTenantRole {
   comercio
 }
 
+/// Rol dentro de un comercio: el titular crea el local; el asistente (sucursal) necesita aprobación para cambiar el catálogo.
+enum StaffRole {
+  owner
+  assistant
+}
+
+enum ChangeEntity {
+  product
+  reward
+}
+
+enum ChangeAction {
+  create
+  update
+  delete
+}
+
+enum ChangeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum TenantCategory {
   helado
   comida_rapida
@@ -52,6 +75,8 @@ model User {
   pointEntries     PointEntry[]
   redemptions      Redemption[]
   devices          DeviceToken[]
+  changesRequested ChangeRequest[]     @relation("ChangeRequestedBy")
+  changesReviewed  ChangeRequest[]     @relation("ChangeReviewedBy")
 
   @@map("users")
 }
@@ -77,6 +102,7 @@ model Tenant {
   redemptions    Redemption[]
   redeemQrs      RedemptionClaim[]
   notifications  Notification[]
+  changeRequests ChangeRequest[]
 
   @@index([latitude, longitude])
   @@map("tenants")
@@ -87,6 +113,7 @@ model UserTenantRoleMap {
   userId    String         @map("user_id") @db.Uuid
   tenantId  String         @map("tenant_id") @db.Uuid
   role      UserTenantRole
+  staffRole StaffRole      @default(owner) @map("staff_role")
   createdAt DateTime       @default(now()) @map("created_at")
   updatedAt DateTime       @updatedAt @map("updated_at")
 
@@ -265,4 +292,32 @@ model Notification {
 
   @@index([tenantId, sentAt])
   @@map("notifications")
+}
+
+/// Cambio de catálogo propuesto por un asistente; no se aplica hasta que un titular lo aprueba.
+model ChangeRequest {
+  id              String       @id @default(uuid()) @db.Uuid
+  tenantId        String       @map("tenant_id") @db.Uuid
+  requestedById   String       @map("requested_by_id") @db.Uuid
+  entity          ChangeEntity
+  action          ChangeAction
+  /// Producto o recompensa afectado (null al crear).
+  targetId        String?      @map("target_id") @db.Uuid
+  /// Nombre del elemento al momento de la solicitud, para mostrarlo aunque luego cambie.
+  targetName      String?      @map("target_name")
+  /// Datos ya validados con el mismo esquema que usa el API directo (null al borrar).
+  payload         Json?
+  status          ChangeStatus @default(PENDING)
+  reviewedById    String?      @map("reviewed_by_id") @db.Uuid
+  reviewedAt      DateTime?    @map("reviewed_at")
+  rejectionReason String?      @map("rejection_reason")
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestedBy User   @relation("ChangeRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  reviewedBy  User?  @relation("ChangeReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status, createdAt])
+  @@index([requestedById])
+  @@map("change_requests")
 }
