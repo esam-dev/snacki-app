@@ -1,17 +1,14 @@
+import { env } from '../../config/env.js';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../common/errors/app-error.js';
+import { slugify } from '../../lib/slug.js';
 import type { CreateTenantInput } from './tenants.schemas.js';
-
-function slugify(value: string): string {
-  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/-{2,}/g, '-');
-}
 
 const tenantSelect = { id: true, name: true, slug: true, isActive: true, createdAt: true } as const;
 
 export const tenantsService = {
   listActive() {
-    return prisma.tenant.findMany({ where: { isActive: true }, orderBy: { name: 'asc' }, select: tenantSelect });
+    return prisma.tenant.findMany({ where: { isActive: true, slug: { not: env.PLATFORM_TENANT_SLUG } }, orderBy: { name: 'asc' }, select: tenantSelect });
   },
 
   async create(input: CreateTenantInput) {
