@@ -7,6 +7,7 @@ import { tenantsRoutes } from './modules/tenants/tenants.routes.js';
 import { merchantRoutes } from './modules/merchant/merchant.routes.js';
 import { claimsRoutes } from './modules/claims/claims.routes.js';
 import { catalogRoutes } from './modules/catalog/catalog.routes.js';
+import { walletRoutes } from './modules/wallet/wallet.routes.js';
 
 export async function buildApp() {
   // 2 MB: deja margen para logos enviados como data URL (ver imageRefSchema).
@@ -29,6 +30,7 @@ export async function buildApp() {
     api.register(merchantRoutes, { prefix: '/merchant' });
     api.register(claimsRoutes, { prefix: '/claims' });
     api.register(catalogRoutes, { prefix: '/catalog' });
+    api.register(walletRoutes, { prefix: '/wallet' });
   }, { prefix: '/api' });
 
   return app;
