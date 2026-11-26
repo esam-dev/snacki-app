@@ -161,7 +161,7 @@ describe('StoreService', () => {
       httpMock.expectOne(URL_CATALOGO).flush({
         data: {
           tenants: [{
-            id: 't1', slug: 'burger-house', name: 'Burger House', category: 'comida_rapida', address: null,
+            id: 't1', slug: 'burger-house', name: 'Burger House', category: 'comida_rapida', address: 'Av. Principal 120', latitude: -33.4372, longitude: -70.6506,
             logoUrl: '/api/catalog/images/tenant/t1?v=1', pointsExpireAt: '2027-03-01T00:00:00.000Z',
             products: [{
               id: 'p1', name: 'Combo nuevo', description: null, points: 300, imageUrl: null,
@@ -178,6 +178,9 @@ describe('StoreService', () => {
       expect(local?.logo).toBe(`${environment.apiBaseUrl}/api/catalog/images/tenant/t1?v=1`);
       // El vencimiento mostrado es el de los puntos del cliente (wallet); sin puntos, no hay fecha.
       expect(local?.vencimiento).toBe('');
+      expect(local?.direccion).toBe('Av. Principal 120');
+      expect(local?.latitud).toBe(-33.4372);
+      expect(local?.longitud).toBe(-70.6506);
       expect(local?.promos.map((p) => p.nombre)).toEqual(['Combo nuevo']);
       expect(local?.productos.map((p) => p.nombre)).toEqual(['Papas gratis']);
       expect(local?.productos[0]?.imagen).toBe(`${environment.apiBaseUrl}/api/catalog/images/reward/r1?v=2`);
