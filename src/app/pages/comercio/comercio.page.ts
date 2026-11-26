@@ -1,11 +1,13 @@
 import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe, DecimalPipe, NgTemplateOutlet } from '@angular/common';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { AlertController, IonButtons, IonContent, IonFooter, IonHeader, IonModal, IonSpinner, IonTitle, IonToolbar, NavController, ToastController } from '@ionic/angular';
 import { AuthService } from '../../services/auth.service';
+import { Punto, esCoordenadaValida, urlComoLlegar } from '../../shared/geo';
 import { IconComponent } from '../../shared/icon/icon.component';
-import { MerchantProduct, MerchantQr, MerchantQrStatus, MerchantReward, MerchantService, MerchantSettings } from '../../services/merchant.service';
+import { SnackiMapComponent } from '../../shared/snacki-map/snacki-map.component';
+import { MerchantProduct, MerchantQr, MerchantQrStatus, MerchantReward, MerchantService, MerchantSettings, esPendiente } from '../../services/merchant.service';
+import { SolicitudesCambioComponent } from './solicitudes-cambio/solicitudes-cambio.component';
 import QRCode from 'qrcode';
 import { addIcons } from 'ionicons';
 import { alertCircle, checkmarkCircle, close, informationCircle } from 'ionicons/icons';
@@ -13,9 +15,14 @@ import { playSuccessChime } from '../../shared/sound/success-chime';
 
 type Aviso = 'ok' | 'error' | 'info';
 
+const AVISO_PENDIENTE = 'Enviado a aprobación: se publicará cuando la cuenta principal lo apruebe.';
+
 type ModalKind = 'promo' | 'reward' | 'settings' | 'map' | 'qr' | null;
 
 /** Unidades máximas por QR (igual que el backend). */
+/** Vista del selector de ubicación cuando la tienda aún no tiene coordenadas (América). */
+const VISTA_INICIAL: Punto = { lat: -15, lng: -60 };
+
 const QR_MAX_CANTIDAD = 20;
 /** Cada cuánto se consulta si el cliente ya escaneó el QR mostrado. */
 const QR_POLL_MS = 4000;
@@ -23,7 +30,7 @@ const QR_POLL_MS = 4000;
 const QR_LOGO_SRC = 'assets/icon/qr-logo.png';
 const QR_SIZE = 640;
 const QR_LOGO_RATIO = 0.2;
-type Section = 'inicio' | 'promos' | 'recompensas';
+type Section = 'inicio' | 'promos' | 'recompensas' | 'solicitudes';
 type PromoStatus = 'activa' | 'programada' | 'finalizada' | 'pausada';
 
 interface SetupTask {
@@ -53,7 +60,7 @@ export const CATEGORIAS = [
   selector: 'app-comercio',
   templateUrl: './comercio.page.html',
   styleUrls: ['./comercio.page.scss'],
-  imports: [IonContent, IonFooter, IonHeader, IonToolbar, IonTitle, IonButtons, IonModal, IonSpinner, FormsModule, DecimalPipe, DatePipe, NgTemplateOutlet, IconComponent],
+  imports: [IonContent, IonFooter, IonHeader, IonToolbar, IonTitle, IonButtons, IonModal, IonSpinner, FormsModule, DecimalPipe, DatePipe, NgTemplateOutlet, IconComponent, SnackiMapComponent, SolicitudesCambioComponent],
 })
 export class ComercioPage {
   private auth = inject(AuthService);
@@ -62,16 +69,17 @@ export class ComercioPage {
   private toast = inject(ToastController);
   private alert = inject(AlertController);
   private cdr = inject(ChangeDetectorRef);
-  private sanitizer = inject(DomSanitizer);
 
   constructor() {
     addIcons({ alertCircle, checkmarkCircle, close, informationCircle });
   }
 
-  /** URL del mapa embebido; se calcula al abrir el modal para no recrear el iframe en cada ciclo. */
-  mapEmbedUrl: SafeResourceUrl | null = null;
-  /** Vista previa del mapa dentro del modal de configuración. */
-  settingsMapUrl: SafeResourceUrl | null = null;
+  /** Ubicación de la tienda que muestra el modal del mapa (objeto estable para que el mapa no recentre). */
+  mapaPunto: Punto | null = null;
+  /** Selector de ubicación del modal de configuración: `settingsCentro` mueve la vista, `settingsPunto` es el pin. */
+  settingsCentro: Punto | null = VISTA_INICIAL;
+  settingsZoom = 3;
+  settingsPunto: Punto | null = null;
   private abrirSettingsTrasMapa = false;
 
   readonly categorias = CATEGORIAS;
@@ -82,6 +90,8 @@ export class ComercioPage {
   loading = false;
 
   section: Section = 'inicio';
+  /** Cambios de sucursales esperando aprobación (titular) o enviados y sin revisar (asistente). */
+  pendientesCambios = 0;
   modal: ModalKind = null;
   saving = false;
 
@@ -185,6 +195,11 @@ export class ComercioPage {
     return Math.max(0, Math.ceil(diff / 86_400_000));
   }
 
+  /** Sucursal (asistente): sus cambios de promos y recompensas necesitan la aprobación de la cuenta principal. */
+  get esAsistente(): boolean {
+    return this.auth.currentUser?.staffRole === 'assistant';
+  }
+
   get tieneUbicacion(): boolean {
     return this.settings?.latitude != null && this.settings?.longitude != null;
   }
@@ -235,6 +250,7 @@ export class ComercioPage {
       this.rewards = rewards;
       this.products = products;
       this.settings = settings;
+      void this.merchant.listChangeRequests('PENDING').then((r) => { this.pendientesCambios = r.pending; this.cdr.markForCheck(); }, () => undefined);
     } catch (e: any) {
       await this.mostrarError(e, 'No se pudieron cargar datos del comercio.');
     } finally {
@@ -271,6 +287,10 @@ export class ComercioPage {
   }
 
   abrirSettings() {
+    if (this.esAsistente) {
+      void this.mostrar('Solo la cuenta principal puede editar los datos del local.', 'info');
+      return;
+    }
     const s = this.settings;
     this.settingsName = s?.name || '';
     this.settingsCategory = s?.category || 'otro';
@@ -291,28 +311,35 @@ export class ComercioPage {
     }
     const lat = Number(this.settings!.latitude);
     const lng = Number(this.settings!.longitude);
-    this.mapEmbedUrl = this.buildMapUrl(lat, lng);
+    this.mapaPunto = { lat, lng };
     this.modal = 'map';
   }
 
-  /** Recalcula la vista previa del mapa del modal de configuración con las coordenadas del formulario. */
-  actualizarMapaSettings() {
+  /**
+   * Coloca el pin según la latitud/longitud del formulario. Con `recentrar` el mapa también se mueve
+   * hasta él (al abrir, al escribir coordenadas o al usar la ubicación del dispositivo); al tocar el mapa
+   * no se recentra para que el pin no "salte" bajo el dedo.
+   */
+  actualizarMapaSettings(recentrar = true) {
     const lat = this.settingsLat === '' || this.settingsLat === null ? NaN : Number(this.settingsLat);
     const lng = this.settingsLng === '' || this.settingsLng === null ? NaN : Number(this.settingsLng);
-    const valido = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
-    this.settingsMapUrl = valido ? this.buildMapUrl(lat, lng) : null;
+    this.settingsPunto = esCoordenadaValida(lat, lng) ? { lat, lng } : null;
+    if (recentrar) {
+      this.settingsCentro = this.settingsPunto ?? VISTA_INICIAL;
+      this.settingsZoom = this.settingsPunto ? 16 : 3;
+    }
   }
 
-  private buildMapUrl(lat: number, lng: number): SafeResourceUrl {
-    const d = 0.004;
-    const url =
-      `https://www.openstreetmap.org/export/embed.html?bbox=${lng - d},${lat - d},${lng + d},${lat + d}` +
-      `&layer=mapnik&marker=${lat},${lng}`;
-    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  /** El comercio tocó el mapa: ese punto pasa a ser la ubicación de la tienda. */
+  elegirPunto(punto: Punto) {
+    this.settingsLat = punto.lat;
+    this.settingsLng = punto.lng;
+    this.actualizarMapaSettings(false);
+    this.cdr.markForCheck();
   }
 
   get googleMapsUrl(): string {
-    return `https://www.google.com/maps/search/?api=1&query=${this.settings?.latitude},${this.settings?.longitude}`;
+    return urlComoLlegar({ lat: Number(this.settings?.latitude), lng: Number(this.settings?.longitude) });
   }
 
   editarUbicacion() {
@@ -577,14 +604,13 @@ export class ComercioPage {
       const imagenOriginal = this.products.find((p) => p.id === this.editingPromoId)?.imageUrl ?? '';
       const imagenCambio = editando ? this.imagenPromo !== imagenOriginal : !!this.imagenPromo;
       if (imagenCambio) payload.imageUrl = this.imagenPromo || null;
-      if (this.editingPromoId) {
-        await this.merchant.updateProduct(this.editingPromoId, payload);
-      } else {
-        await this.merchant.createProduct(payload);
-      }
+      const res = this.editingPromoId
+        ? await this.merchant.updateProduct(this.editingPromoId, payload)
+        : await this.merchant.createProduct(payload);
       this.modal = null;
       await this.loadAll();
-      await this.mostrar(editando ? 'Promo actualizada correctamente.' : 'Promo publicada correctamente.', 'ok');
+      if (esPendiente(res)) await this.mostrar(AVISO_PENDIENTE, 'info');
+      else await this.mostrar(editando ? 'Promo actualizada correctamente.' : 'Promo publicada correctamente.', 'ok');
     } catch (e: any) {
       await this.mostrarError(e, 'No se pudo guardar la promo.');
     } finally {
@@ -598,6 +624,7 @@ export class ComercioPage {
     try {
       const res = await this.merchant.deleteProduct(product.id);
       await this.loadAll();
+      if (esPendiente(res)) return void (await this.mostrar(AVISO_PENDIENTE, 'info'));
       await this.mostrar(res.archived ? 'Promo eliminada. Sus ventas anteriores quedan en el historial.' : 'Promo eliminada correctamente.', 'ok');
     } catch (e: any) {
       await this.mostrarError(e, 'No se pudo eliminar la promo.');
@@ -624,14 +651,13 @@ export class ComercioPage {
       const imagenOriginal = this.rewards.find((r) => r.id === this.editingRewardId)?.imageUrl ?? '';
       const imagenCambio = editando ? this.imagenRecompensa !== imagenOriginal : !!this.imagenRecompensa;
       if (imagenCambio) payload.imageUrl = this.imagenRecompensa || null;
-      if (this.editingRewardId) {
-        await this.merchant.updateReward(this.editingRewardId, payload);
-      } else {
-        await this.merchant.createReward(payload);
-      }
+      const res = this.editingRewardId
+        ? await this.merchant.updateReward(this.editingRewardId, payload)
+        : await this.merchant.createReward(payload);
       this.modal = null;
       await this.loadAll();
-      await this.mostrar(editando ? 'Recompensa actualizada correctamente.' : 'Recompensa creada correctamente.', 'ok');
+      if (esPendiente(res)) await this.mostrar(AVISO_PENDIENTE, 'info');
+      else await this.mostrar(editando ? 'Recompensa actualizada correctamente.' : 'Recompensa creada correctamente.', 'ok');
     } catch (e: any) {
       await this.mostrarError(e, 'No se pudo guardar la recompensa.');
     } finally {
@@ -645,6 +671,7 @@ export class ComercioPage {
     try {
       const res = await this.merchant.deleteReward(reward.id);
       await this.loadAll();
+      if (esPendiente(res)) return void (await this.mostrar(AVISO_PENDIENTE, 'info'));
       await this.mostrar(res.archived ? 'Recompensa eliminada. Sus canjes anteriores quedan en el historial.' : 'Recompensa eliminada correctamente.', 'ok');
     } catch (e: any) {
       await this.mostrarError(e, 'No se pudo eliminar la recompensa.');
@@ -655,6 +682,12 @@ export class ComercioPage {
     if (this.saving || this.procesandoLogo) return;
     if (!this.settingsName.trim()) {
       await this.mostrar('El nombre de la tienda es obligatorio.');
+      return;
+    }
+    const sinLat = this.settingsLat === '' || this.settingsLat === null;
+    const sinLng = this.settingsLng === '' || this.settingsLng === null;
+    if (sinLat !== sinLng) {
+      await this.mostrar('Completa latitud y longitud, o elige el punto en el mapa.');
       return;
     }
     this.saving = true;
@@ -862,7 +895,7 @@ export class ComercioPage {
   }
 
   /** Aviso arriba de la pantalla: verde con sonido si salió bien, rojo si falló, azul si es informativo. */
-  private async mostrar(message: string, tipo: Aviso = 'error') {
+  async mostrar(message: string, tipo: Aviso = 'error') {
     if (tipo === 'ok') playSuccessChime();
     const icon = tipo === 'ok' ? 'checkmark-circle' : tipo === 'error' ? 'alert-circle' : 'information-circle';
     const toast = await this.toast.create({

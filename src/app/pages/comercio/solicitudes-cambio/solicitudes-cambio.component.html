@@ -1,0 +1,54 @@
+<section class="solicitudes">
+  <p class="intro">
+    @if (puedeRevisar()) { Las sucursales proponen cambios de promos y recompensas; se publican cuando los apruebas. }
+    @else { Tus cambios de promos y recompensas se publican cuando la cuenta principal los aprueba. }
+  </p>
+
+  @if (cargando && !solicitudes.length) {
+    <p class="vacio">Cargando solicitudes…</p>
+  } @else if (!solicitudes.length) {
+    <p class="vacio">
+      <app-icon name="circle-check" />
+      {{ puedeRevisar() ? 'No hay solicitudes por revisar.' : 'Aún no enviaste cambios.' }}
+    </p>
+  } @else {
+    <ul class="lista">
+      @for (r of solicitudes; track r.id) {
+        <li class="item" [class.pendiente]="r.status === 'PENDING'">
+          <div class="cab">
+            <strong>{{ titulo(r) }}</strong>
+            <span class="estado" [attr.data-estado]="r.status">{{ estado(r) }}</span>
+          </div>
+          <div class="meta">
+            <app-icon name="clock" /> {{ r.createdAt | date: 'dd/MM/yyyy HH:mm' }}
+            @if (puedeRevisar()) { · {{ r.requestedBy.fullName }} }
+          </div>
+
+          @if (detalle(r).length) {
+            <dl class="detalle">
+              @for (d of detalle(r); track d.campo) {
+                <div><dt>{{ d.campo }}</dt><dd>{{ d.valor }}</dd></div>
+              }
+            </dl>
+          }
+
+          @if (r.status === 'REJECTED' && r.rejectionReason) {
+            <p class="motivo">Motivo: {{ r.rejectionReason }}</p>
+          }
+          @if (r.status !== 'PENDING' && r.reviewedBy) {
+            <p class="revision">Revisada por {{ r.reviewedBy.fullName }}</p>
+          }
+
+          @if (puedeRevisar() && r.status === 'PENDING') {
+            <div class="acciones">
+              <button type="button" class="rechazar" [disabled]="trabajando === r.id" (click)="rechazar(r)">Rechazar</button>
+              <button type="button" class="aprobar" [disabled]="trabajando === r.id" (click)="aprobar(r)">
+                {{ trabajando === r.id ? 'Aplicando…' : 'Aprobar y publicar' }}
+              </button>
+            </div>
+          }
+        </li>
+      }
+    </ul>
+  }
+</section>
