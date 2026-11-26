@@ -5,28 +5,56 @@
     <div class="caption"><ion-icon name="card-outline"></ion-icon> Resumen de puntos de la cuenta</div>
     <div class="value">{{ total | number }} PTS EN TOTAL</div>
   </section>
-  <p class="demo-note">El saldo de cada comercio es independiente. En esta demo se guarda en este dispositivo; el comercio aún no tiene una vista sincronizada de tu saldo.</p>
+  @if (usaWallet) {
+    <p class="demo-note">
+      Los puntos de cada comercio solo se usan en ese comercio.
+      @if (actualizado) { Actualizado {{ actualizado | date: 'dd/MM HH:mm' }}. }
+    </p>
+  } @else {
+    <p class="demo-note">Modo demostración: el saldo se guarda en este dispositivo hasta conectar con el servidor.</p>
+  }
 
   <div class="rows">
     @for (local of locales; track local.id) {
       <div class="row">
-        <img [src]="local.logo" [alt]="local.nombre" />
-        <span class="name">{{ local.nombre }}</span>
-        <span class="detail">
-          Pts. Asociados: {{ local.puntos | number }} PTS
-          @if (local.vencimiento) {
-            <small class="venc">Vencimiento: {{ local.vencimiento | date: 'dd/MM/yyyy' }}</small>
-          }
-        </span>
+        <div class="row-main">
+          <img [src]="local.logo" [alt]="local.nombre" />
+          <span class="name">{{ local.nombre }}</span>
+          <span class="detail">
+            {{ local.puntos | number }} PTS
+            @if (local.vencimiento) {
+              <small class="venc" [class.soon]="vencePronto(local)">
+                @if (local.puntosPorVencer && local.puntosPorVencer < local.puntos) {
+                  {{ local.puntosPorVencer | number }} vencen el {{ local.vencimiento | date: 'dd/MM/yyyy' }}
+                } @else {
+                  Vencen el {{ local.vencimiento | date: 'dd/MM/yyyy' }}
+                }
+              </small>
+            }
+          </span>
+        </div>
+        @if (usaWallet && (local.siguienteRecompensa || local.canjeables)) {
+          <div class="progress" [attr.aria-label]="'Progreso en ' + local.nombre">
+            <div class="bar"><span [style.width.%]="progreso(local)"></span></div>
+            <small>
+              @if (local.siguienteRecompensa; as meta) {
+                Te faltan {{ meta.faltan | number }} PTS para {{ meta.nombre }}
+              } @else {
+                ¡Ya puedes canjear todas las recompensas!
+              }
+              @if (local.canjeables) { · {{ local.canjeables }} canjeable{{ local.canjeables === 1 ? '' : 's' }} }
+            </small>
+          </div>
+        }
       </div>
     }
   </div>
 
   <h2 class="canjes-title">Movimientos recientes</h2>
   @for (c of movimientos; track c.id) {
-    <div class="canje">
-      <span>{{ c.local }} · {{ c.descripcion }}</span>
-      <span [class.earned]="c.tipo === 'acumulacion'">{{ c.tipo === 'acumulacion' ? '+' : '-' }}{{ c.puntos | number }} PTS · {{ c.fecha | date: 'dd/MM/yyyy' }}</span>
+    <div class="canje" [class.expired]="c.vencido">
+      <span>{{ c.local }} · {{ c.descripcion }}@if (c.vencido) { <em>(vencido)</em> }</span>
+      <span [class.earned]="c.tipo === 'acumulacion' && !c.vencido">{{ c.tipo === 'acumulacion' ? '+' : '-' }}{{ c.puntos | number }} PTS · {{ c.fecha | date: 'dd/MM/yyyy' }}</span>
     </div>
   } @empty {
     <p class="empty-history">Aún no hay compras escaneadas ni canjes.</p>

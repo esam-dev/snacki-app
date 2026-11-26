@@ -6,15 +6,15 @@
     <ol>
       <li><strong>Compra en un comercio afiliado.</strong></li>
       <li><strong>Pide su QR de compra</strong> y escanéalo para sumar puntos en ese comercio.</li>
-      <li><strong>Canjea recompensas</strong> usando el saldo de ese mismo comercio.</li>
+      <li><strong>Para canjear una recompensa</strong>, pide en el local su QR de canje y escanéalo: los puntos se descuentan solo al confirmar.</li>
     </ol>
     <p>Los puntos y movimientos se muestran por separado para cada comercio.</p>
   </section>
 
   <div class="center">
     <ion-button class="snacki-btn" shape="round" [disabled]="escaneando" (click)="escanear()">
-      {{ escaneando ? 'Abriendo cámara…' : 'Escanear QR de compra' }}
+      {{ escaneando ? 'Abriendo cámara…' : 'Escanear QR' }}
     </ion-button>
   </div>
-  <p class="demo-note">Modo demostración: el comercio aún no recibe estos movimientos. La validación compartida se conectará al backend.</p>
+  <p class="demo-note">Cada QR de compra sirve una sola vez y vence a las 24 h. Los puntos se acreditan al instante en tu cuenta.</p>
 </ion-content>

@@ -35,7 +35,7 @@
             <div class="info">
               <div class="name">{{ p.nombre }}</div>
               <div class="pts">{{ p.puntos | number }} PTS</div>
-              <ion-button class="snacki-btn redeem-btn" size="small" [disabled]="canjeando" (click)="canjear(p)">Canjear</ion-button>
+              <ion-button class="snacki-btn redeem-btn" size="small" (click)="canjear(p)">Canjear en el local</ion-button>
             </div>
           </article>
         }

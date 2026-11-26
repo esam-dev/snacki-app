@@ -1,9 +1,10 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom, timeout } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 import { emptyRecord, readJson, writeJson } from './demo-storage';
+import { WalletComercio, WalletService } from './wallet.service';
 
 /** Recompensa canjeable por puntos. */
 export interface Producto {
@@ -35,6 +36,10 @@ export interface Local {
   promos: Promo[];
   categoria?: string;
   direccion?: string;
+  /** Datos de la wallet del servidor (solo con sesión de cliente y catálogo del servidor). */
+  siguienteRecompensa?: WalletComercio['siguiente'];
+  puntosPorVencer?: number;
+  canjeables?: number;
 }
 
 interface ApiPromo {
@@ -55,6 +60,8 @@ export interface MovimientoPuntos {
   descripcion: string;
   puntos: number;
   fecha: string;
+  /** Puntos acumulados que vencieron sin usarse (ya no cuentan en el saldo). */
+  vencido?: boolean;
 }
 
 interface DemoState {
@@ -70,14 +77,19 @@ const CATALOGO_KEY = 'snacki.catalog-cache';
 const IMAGEN_POR_DEFECTO = 'assets/icon/icon-snacki.png';
 const CATALOGO_TIMEOUT_MS = 10_000;
 
-/** Estado local para la demo; en producción los saldos deben venir del backend. */
+/**
+ * Catálogo y saldos que ve el cliente. Con catálogo del servidor y sesión de cliente, los saldos y
+ * movimientos vienen de la wallet del backend; el estado local solo se usa en modo demostración.
+ */
 @Injectable({ providedIn: 'root' })
 export class StoreService {
   private auth = inject(AuthService);
   private http = inject(HttpClient);
+  private wallet = inject(WalletService);
 
-  /** Sube cada vez que el catálogo del servidor cambia; las pantallas lo observan para repintarse. */
-  readonly catalogoVersion = signal(0);
+  private readonly versionCatalogo = signal(0);
+  /** Sube cada vez que cambia el catálogo o la wallet del servidor; las pantallas lo observan para repintarse. */
+  readonly catalogoVersion = computed(() => this.versionCatalogo() + this.wallet.version());
   private catalogoRemoto: Local[] | null = this.leerCatalogoCache();
   private ultimaActualizacion = 0;
   private refrescando: Promise<boolean> | null = null;
@@ -126,7 +138,7 @@ export class StoreService {
         this.catalogoRemoto = (res.data?.tenants ?? []).map((tenant) => this.mapearTenant(tenant));
         this.ultimaActualizacion = Date.now();
         writeJson(CATALOGO_KEY, this.catalogoRemoto);
-        this.catalogoVersion.update((v) => v + 1);
+        this.versionCatalogo.update((v) => v + 1);
         return true;
       } catch {
         // Sin conexión o servidor caído: se sigue con el último catálogo conocido.
@@ -138,20 +150,50 @@ export class StoreService {
     return this.refrescando;
   }
 
+  /** Catálogo y wallet a la vez (lo que usan las pantallas del cliente). */
+  async refrescar(maxEdadMs = 0): Promise<void> {
+    await Promise.all([this.refrescarCatalogo(maxEdadMs), this.wallet.refrescar(maxEdadMs)]);
+  }
+
+  /** true cuando los saldos salen del servidor y no del estado de demostración. */
+  get usaWallet(): boolean {
+    return this.catalogoRemoto !== null && this.wallet.disponible;
+  }
+
+  /** Última vez que la wallet se sincronizó con el servidor (ISO), si aplica. */
+  get walletActualizada(): string | null {
+    return this.usaWallet ? this.wallet.datos?.actualizado ?? null : null;
+  }
+
   getAll(): Local[] {
     const saldos = this.leerSaldosUsuario();
-    return this.locales.map((local) => ({
-      ...local,
-      puntos: this.getSaldoDesde(local, saldos),
-      productos: this.getProductos(local),
-    }));
+    return this.locales.map((local) => this.conSaldo(local, saldos));
   }
 
   getById(id: string | null | undefined): Local | undefined {
     const local = this.locales.find((item) => item.id === id);
     if (!local) return undefined;
-    const saldos = this.leerSaldosUsuario();
-    return { ...local, puntos: this.getSaldoDesde(local, saldos), productos: this.getProductos(local) };
+    return this.conSaldo(local, this.leerSaldosUsuario());
+  }
+
+  private conSaldo(local: Local, saldos: Record<string, number>): Local {
+    const base = { ...local, productos: this.getProductos(local) };
+    if (!this.usaWallet) return { ...base, puntos: this.getSaldoDesde(local, saldos) };
+    // Comercio sin movimientos (o wallet aún sin descargar): saldo 0, nunca el de demostración.
+    const w = this.wallet.comercio(local.id);
+    return {
+      ...base,
+      puntos: w?.saldo ?? 0,
+      vencimiento: w?.vence ? w.vence.slice(0, 10) : '',
+      puntosPorVencer: w?.puntosPorVencer ?? 0,
+      siguienteRecompensa: w ? w.siguiente : this.primeraRecompensa(base.productos),
+      canjeables: w?.canjeables ?? 0,
+    };
+  }
+
+  private primeraRecompensa(productos: Producto[]): WalletComercio['siguiente'] {
+    const masBarata = [...productos].sort((a, b) => a.puntos - b.puntos)[0];
+    return masBarata ? { id: masBarata.id ?? masBarata.nombre, nombre: masBarata.nombre, costo: masBarata.puntos, faltan: masBarata.puntos, progreso: 0 } : null;
   }
 
   buscar(texto: string): Local[] {
@@ -160,12 +202,12 @@ export class StoreService {
   }
 
   get totalPuntos(): number {
-    const saldos = this.leerSaldosUsuario();
-    return this.locales.reduce((sum, local) => sum + this.getSaldoDesde(local, saldos), 0);
+    return this.getAll().reduce((sum, local) => sum + local.puntos, 0);
   }
 
   get movimientos(): MovimientoPuntos[] {
-    return this.leerMovimientosUsuario().sort((a, b) => b.fecha.localeCompare(a.fecha));
+    const lista = this.usaWallet ? [...(this.wallet.datos?.movimientos ?? [])] : this.leerMovimientosUsuario();
+    return lista.sort((a, b) => b.fecha.localeCompare(a.fecha));
   }
 
   /** Acredita un QR de demostración una sola vez por identificador de compra. */
@@ -198,38 +240,6 @@ export class StoreService {
     const nuevoEstado = this.clonarEstado(state);
     nuevoEstado.movimientos[userKey] = nuevosMovimientosUsuario;
     nuevoEstado.saldos[userKey] = nuevosSaldosUsuario;
-
-    if (!writeJson(STATE_KEY, nuevoEstado)) return 'invalido';
-    return 'ok';
-  }
-
-  canjear(localId: string, producto: Producto): 'ok' | 'saldo-insuficiente' | 'invalido' {
-    const local = this.locales.find((item) => item.id === localId);
-    if (!local || !this.esProductoValido(producto)) return 'invalido';
-    if (!this.getProductos(local).some((item) => this.mismoProducto(item, producto))) return 'invalido';
-
-    const state = this.leerEstado();
-    const userKey = this.usuarioKey();
-    const saldosUsuario = this.leerSaldosDeEstado(state, userKey);
-    const saldo = this.getSaldoDesde(local, saldosUsuario);
-    if (saldo < producto.puntos) return 'saldo-insuficiente';
-
-    const movimientosUsuario = this.leerMovimientosDeEstado(state, userKey);
-    const nuevoMovimiento: MovimientoPuntos = {
-      id: `redeem:${Date.now()}:${Math.random().toString(36).slice(2)}`,
-      localId,
-      local: local.nombre,
-      tipo: 'canje',
-      descripcion: producto.nombre,
-      puntos: producto.puntos,
-      fecha: new Date().toISOString(),
-    };
-
-    const nuevosSaldosUsuario = this.clonarMapaNumerico(saldosUsuario);
-    nuevosSaldosUsuario[localId] = saldo - producto.puntos;
-    const nuevoEstado = this.clonarEstado(state);
-    nuevoEstado.saldos[userKey] = nuevosSaldosUsuario;
-    nuevoEstado.movimientos[userKey] = [...movimientosUsuario, nuevoMovimiento];
 
     if (!writeJson(STATE_KEY, nuevoEstado)) return 'invalido';
     return 'ok';
@@ -444,13 +454,12 @@ export class StoreService {
   }
 
   private mapearTenant(tenant: ApiTenant): Local {
-    // El saldo de demostración de los comercios conocidos se conserva; los nuevos arrancan en 0.
-    const base = this.localesBase.find((item) => item.id === tenant.slug);
+    // El saldo real lo pone la wallet del servidor (ver conSaldo).
     return {
       id: tenant.slug,
       nombre: tenant.name,
       logo: this.resolverImagen(tenant.logoUrl) || IMAGEN_POR_DEFECTO,
-      puntos: base?.puntos ?? 0,
+      puntos: 0,
       vencimiento: tenant.pointsExpireAt ? tenant.pointsExpireAt.slice(0, 10) : '',
       categoria: tenant.category,
       direccion: tenant.address ?? undefined,
