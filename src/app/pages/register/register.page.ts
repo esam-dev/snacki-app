@@ -13,6 +13,14 @@ import { AuthService } from '../../services/auth.service';
 
 interface TenantOption { id: string; name: string; slug: string; }
 
+const CATEGORIAS_LOCAL = [
+  { id: 'comida_rapida', nombre: 'Comida rápida' },
+  { id: 'pizza', nombre: 'Pizza' },
+  { id: 'cafe', nombre: 'Café' },
+  { id: 'helado', nombre: 'Helados' },
+  { id: 'otro', nombre: 'Otros' },
+];
+
 @Component({
   selector: 'app-register',
   templateUrl: './register.page.html',
@@ -29,9 +37,12 @@ export class RegisterPage implements OnInit {
   private returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') ?? '';
 
   tipoCuenta: 'cliente' | 'comercio' = this.route.snapshot.queryParamMap.get('tipo') === 'comercio' ? 'comercio' : 'cliente';
+  /** Comercio: `nuevo` crea un local propio (titular); `sucursal` se une a uno existente (asistente). */
+  modoComercio: 'nuevo' | 'sucursal' = 'nuevo';
+  readonly categorias = CATEGORIAS_LOCAL;
   locales: TenantOption[] = [];
   cargandoLocales = false;
-  form = { nombre: '', edad: null as number | null, password: '', confirmar: '', correo: '', cedula: '', acepta: false, comercioId: '' };
+  form = { nombre: '', edad: null as number | null, password: '', confirmar: '', correo: '', cedula: '', acepta: false, comercioId: '', nombreLocal: '', categoria: 'otro' };
   verPassword = false;
   verConfirmar = false;
   enviando = false;
@@ -50,7 +61,7 @@ export class RegisterPage implements OnInit {
   async registrar() {
     if (this.enviando) return;
     const f = this.form;
-    const error = !f.nombre.trim() || !f.password || !f.correo.trim() || !f.cedula.trim() || (this.tipoCuenta === 'cliente' && f.edad === null) || (this.tipoCuenta === 'comercio' && !f.comercioId)
+    const error = !f.nombre.trim() || !f.password || !f.correo.trim() || !f.cedula.trim() || (this.tipoCuenta === 'cliente' && f.edad === null) || (this.tipoCuenta === 'comercio' && this.modoComercio === 'sucursal' && !f.comercioId) || (this.tipoCuenta === 'comercio' && this.modoComercio === 'nuevo' && !f.nombreLocal.trim())
       ? 'Completa todos los campos.'
       : this.tipoCuenta === 'cliente' && (!Number.isInteger(Number(f.edad)) || Number(f.edad) < 18)
       ? 'Debes tener 18 años o más para registrarte.'
@@ -61,10 +72,18 @@ export class RegisterPage implements OnInit {
 
     this.enviando = true;
     try {
-      const result = await this.auth.register(f.nombre, f.correo, f.password, this.tipoCuenta, f.comercioId || undefined);
+      const result = await this.auth.register(
+        f.nombre, f.correo, f.password, this.tipoCuenta,
+        this.modoComercio === 'sucursal' ? f.comercioId || undefined : undefined,
+        this.tipoCuenta === 'comercio' && this.modoComercio === 'nuevo' ? { nombre: f.nombreLocal, categoria: f.categoria } : undefined,
+      );
       if (!result.success) return this.mostrarToast(result.message || 'No se pudo crear la cuenta.', 'danger');
       await this.nav.navigateRoot(this.destinoSeguro(), { replaceUrl: true });
     } finally { this.enviando = false; this.cdr.markForCheck(); }
+  }
+
+  get nombreSucursal(): string {
+    return this.locales.find((l) => l.id === this.form.comercioId)?.name ?? '';
   }
 
   agregarFoto() {}

@@ -116,6 +116,44 @@ describe('AuthService (backend auth)', () => {
     expect(auth.currentUser).toBeNull();
   });
 
+  const SESION = (role: 'comercio', staffRole: 'owner' | 'assistant') => ({
+    data: {
+      user: { id: 'u1', fullName: 'Ana', email: 'ana@example.com', isActive: true },
+      membership: { role, staffRole, tenantId: 't1', tenantSlug: 'burger-house', tenantName: 'Burger House' },
+      auth: { accessToken: 'tok', tokenType: 'Bearer', expiresIn: 3600 },
+    },
+  });
+
+  it('registro de local nuevo envía el nombre y la categoría, sin tenantId', async () => {
+    const { auth, httpMock } = setup();
+    const promise = auth.register('Ana', 'ana@example.com', 'secreto123', 'comercio', undefined, { nombre: ' Mi Local ', categoria: 'cafe' });
+    await Promise.resolve();
+    const req = httpMock.expectOne(`${environment.apiBaseUrl}/api/auth/register`);
+    expect(req.request.body).toMatchObject({ accountType: 'comercio', businessMode: 'new', tenantName: 'Mi Local', category: 'cafe', tenantId: null });
+    req.flush(SESION('comercio', 'owner'));
+    expect((await promise).success).toBe(true);
+    expect(auth.currentUser?.staffRole).toBe('owner');
+  });
+
+  it('registro de sucursal envía el comercio asociado y queda como asistente', async () => {
+    const { auth, httpMock } = setup();
+    const promise = auth.register('Ana', 'ana@example.com', 'secreto123', 'comercio', 't1');
+    await Promise.resolve();
+    const req = httpMock.expectOne(`${environment.apiBaseUrl}/api/auth/register`);
+    expect(req.request.body).toMatchObject({ businessMode: 'branch', tenantId: 't1' });
+    expect(req.request.body.tenantName).toBeUndefined();
+    req.flush(SESION('comercio', 'assistant'));
+    expect((await promise).success).toBe(true);
+    expect(auth.currentUser?.staffRole).toBe('assistant');
+  });
+
+  it('registro de comercio exige nombre de local o comercio asociado', async () => {
+    const { auth, httpMock } = setup();
+    expect((await auth.register('Ana', 'ana@example.com', 'secreto123', 'comercio', undefined, { nombre: '  ' })).success).toBe(false);
+    expect((await auth.register('Ana', 'ana@example.com', 'secreto123', 'comercio')).message).toContain('comercio asociado');
+    httpMock.expectNone(`${environment.apiBaseUrl}/api/auth/register`);
+  });
+
   it('cerrarSesion deja la sesión anónima aunque falle el almacenamiento del token', async () => {
     const { auth, tokenStorage } = setup();
     (auth as any).authStatus.set('authenticated');
