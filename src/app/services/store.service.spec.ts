@@ -54,9 +54,9 @@ function setAuthUser(auth: AuthService, user: SessionUser): void {
   (auth as any).authStatus.set('authenticated');
 }
 
-function crearStore(user: SessionUser): StoreService {
+function crearStore(user: SessionUser, limpiarStorage = true): StoreService {
   TestBed.resetTestingModule();
-  localStorage.clear();
+  if (limpiarStorage) localStorage.clear();
   TestBed.configureTestingModule({
     providers: [
       AuthService,
@@ -165,7 +165,7 @@ describe('StoreService', () => {
       const comercio = crearStore(COMERCIO_BURGER);
       expect(comercio.agregarRecompensa('burger-house', 'Recompensa costosa', 9999)).toBe(true);
     }
-    const cliente = crearStore(CLIENTE);
+    const cliente = crearStore(CLIENTE, false);
     const caro = cliente.getById('burger-house')?.productos.find((item) => item.nombre === 'Recompensa costosa') || { nombre: 'X', puntos: 9999, imagen: 'assets/img/prod-combo-bacon.jpg' };
     const saldoAntes = saldo(cliente, 'burger-house');
     expect(cliente.canjear('burger-house', caro as Producto)).toBe('saldo-insuficiente');
