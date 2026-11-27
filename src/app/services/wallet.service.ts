@@ -51,7 +51,7 @@ export type ResultadoCanje =
   | { ok: false; codigo: string; mensaje: string };
 
 export type ResultadoEscaneo =
-  | { ok: true; puntos: number; comercio: string; comercioId: string; saldo: number | null }
+  | { ok: true; puntos: number; comercio: string; comercioId: string; saldo: number | null; bonoReferido: number }
   | { ok: false; codigo: string; mensaje: string };
 
 interface ApiWalletTenant {
@@ -60,10 +60,15 @@ interface ApiWalletTenant {
   nextReward: { id: string; name: string; cost: number; missing: number; progress: number } | null;
 }
 interface ApiMovement {
-  id: string; tenantSlug: string; tenantName: string; type: 'EARN' | 'REDEEM';
+  id: string; tenantSlug: string; tenantName: string; type: 'EARN' | 'REDEEM' | 'REFERRAL_BONUS';
   points: number; description: string; createdAt: string; expired: boolean;
 }
-interface ApiClaim { points: number; tenant: { id: string; name: string } }
+interface ApiClaim {
+  points: number;
+  tenant: { id: string; name: string };
+  /** Bono del invitado si esta compra completó su referido. */
+  referralBonus?: { points: number } | null;
+}
 
 const CACHE_PREFIX = 'snacki.wallet.';
 const TIMEOUT_MS = 10_000;
@@ -172,6 +177,7 @@ export class WalletService {
         comercio: res.data.tenant.name,
         comercioId: comercio?.slug ?? '',
         saldo: comercio?.saldo ?? null,
+        bonoReferido: res.data.referralBonus?.points ?? 0,
       };
     } catch (err) {
       return this.mapearError(err);

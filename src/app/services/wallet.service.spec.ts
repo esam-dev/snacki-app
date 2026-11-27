@@ -65,9 +65,21 @@ describe('WalletService', () => {
     await tick();
     flushWallet(http, 570);
 
-    expect(await promesa).toEqual({ ok: true, puntos: 120, comercio: 'Burger House', comercioId: 'burger-house', saldo: 570 });
+    expect(await promesa).toEqual({ ok: true, puntos: 120, comercio: 'Burger House', comercioId: 'burger-house', saldo: 570, bonoReferido: 0 });
     expect(wallet.comercio('burger-house')?.saldo).toBe(570);
     http.verify();
+  });
+
+  it('escanear: informa el bono cuando la compra completa una invitación', async () => {
+    const { wallet, http } = crear();
+    const promesa = wallet.escanear('S1.x.y.z');
+    http.expectOne(`${API}/api/claims`).flush(
+      { data: { points: 120, tenant: { id: 't1', name: 'Burger House' }, referralBonus: { referralId: 'r1', points: 50, referrerPoints: 100 } } },
+      { status: 201, statusText: 'Created' },
+    );
+    await tick();
+    flushWallet(http, 170);
+    expect(await promesa).toMatchObject({ ok: true, puntos: 120, saldo: 170, bonoReferido: 50 });
   });
 
   it('escanear: muestra el mensaje del servidor cuando el QR ya fue usado', async () => {
