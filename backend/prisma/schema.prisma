@@ -46,6 +46,12 @@ enum TenantCategory {
 enum PointEntryType {
   EARN
   REDEEM
+  REFERRAL_BONUS
+}
+
+enum ReferralStatus {
+  PENDING
+  COMPLETED
 }
 
 enum RedemptionStatus {
@@ -77,32 +83,42 @@ model User {
   devices          DeviceToken[]
   changesRequested ChangeRequest[]     @relation("ChangeRequestedBy")
   changesReviewed  ChangeRequest[]     @relation("ChangeReviewedBy")
+  referralCodes    ReferralCode[]
+  referralsMade    Referral[]          @relation("ReferralReferrer")
+  referralsJoined  Referral[]          @relation("ReferralReferee")
 
   @@map("users")
 }
 
 model Tenant {
-  id             String              @id @default(uuid()) @db.Uuid
-  name           String
-  slug           String              @unique
-  category       TenantCategory      @default(otro)
-  address        String?
-  latitude       Float?
-  longitude      Float?
-  logoUrl        String?             @map("logo_url")
-  pointsExpireAt DateTime?           @map("points_expire_at")
-  isActive       Boolean             @default(true) @map("is_active")
-  createdAt      DateTime            @default(now()) @map("created_at")
-  updatedAt      DateTime            @updatedAt @map("updated_at")
-  memberships    UserTenantRoleMap[]
-  products       Product[]
-  rewards        Reward[]
-  claims         PurchaseClaim[]
-  pointEntries   PointEntry[]
-  redemptions    Redemption[]
-  redeemQrs      RedemptionClaim[]
-  notifications  Notification[]
-  changeRequests ChangeRequest[]
+  id                  String              @id @default(uuid()) @db.Uuid
+  name                String
+  slug                String              @unique
+  category            TenantCategory      @default(otro)
+  address             String?
+  latitude            Float?
+  longitude           Float?
+  logoUrl             String?             @map("logo_url")
+  pointsExpireAt      DateTime?           @map("points_expire_at")
+  /// Reglas de referidos: bono para quien invita y para el invitado, y tope de invitaciones por cliente (anti-abuso).
+  referralEnabled     Boolean             @default(false) @map("referral_enabled")
+  referrerBonusPoints Int                 @default(0) @map("referrer_bonus_points")
+  refereeBonusPoints  Int                 @default(0) @map("referee_bonus_points")
+  referralMaxPerUser  Int                 @default(10) @map("referral_max_per_user")
+  isActive            Boolean             @default(true) @map("is_active")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+  memberships         UserTenantRoleMap[]
+  products            Product[]
+  rewards             Reward[]
+  claims              PurchaseClaim[]
+  pointEntries        PointEntry[]
+  redemptions         Redemption[]
+  redeemQrs           RedemptionClaim[]
+  notifications       Notification[]
+  changeRequests      ChangeRequest[]
+  referralCodes       ReferralCode[]
+  referrals           Referral[]
 
   @@index([latitude, longitude])
   @@map("tenants")
@@ -189,30 +205,36 @@ model PurchaseClaim {
   createdBy  User        @relation("ClaimCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   claimedBy  User?       @relation("ClaimClaimedBy", fields: [claimedById], references: [id], onDelete: SetNull)
   pointEntry PointEntry?
+  referral   Referral?
 
   @@index([tenantId, createdAt])
   @@map("purchase_claims")
 }
 
-/// Libro de puntos. Saldo = suma de `remaining` de EARN no vencidos.
-/// Los canjes consumen EARN en orden FIFO por `expiresAt`.
+/// Libro de puntos. Saldo = suma de `remaining` de EARN y REFERRAL_BONUS no vencidos.
+/// Los canjes los consumen en orden FIFO por `expiresAt`.
 model PointEntry {
-  id        String         @id @default(uuid()) @db.Uuid
-  userId    String         @map("user_id") @db.Uuid
-  tenantId  String         @map("tenant_id") @db.Uuid
-  type      PointEntryType
-  points    Int
-  remaining Int            @default(0)
-  expiresAt DateTime?      @map("expires_at")
-  claimId   String?        @unique @map("claim_id") @db.Uuid
-  rewardId  String?        @map("reward_id") @db.Uuid
-  createdAt DateTime       @default(now()) @map("created_at")
+  id         String         @id @default(uuid()) @db.Uuid
+  userId     String         @map("user_id") @db.Uuid
+  tenantId   String         @map("tenant_id") @db.Uuid
+  type       PointEntryType
+  points     Int
+  remaining  Int            @default(0)
+  expiresAt  DateTime?      @map("expires_at")
+  claimId    String?        @unique @map("claim_id") @db.Uuid
+  rewardId   String?        @map("reward_id") @db.Uuid
+  /// Referido que originó un REFERRAL_BONUS.
+  referralId String?        @map("referral_id") @db.Uuid
+  createdAt  DateTime       @default(now()) @map("created_at")
 
-  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  claim  PurchaseClaim? @relation(fields: [claimId], references: [id], onDelete: SetNull)
-  reward Reward?        @relation(fields: [rewardId], references: [id], onDelete: SetNull)
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  claim    PurchaseClaim? @relation(fields: [claimId], references: [id], onDelete: SetNull)
+  reward   Reward?        @relation(fields: [rewardId], references: [id], onDelete: SetNull)
+  referral Referral?      @relation(fields: [referralId], references: [id], onDelete: SetNull)
 
+  /// Un solo bono por persona y referido (segunda barrera contra liquidar dos veces).
+  @@unique([referralId, userId])
   @@index([userId, tenantId, type, expiresAt])
   @@index([tenantId, createdAt])
   @@map("point_entries")
@@ -320,4 +342,45 @@ model ChangeRequest {
   @@index([tenantId, status, createdAt])
   @@index([requestedById])
   @@map("change_requests")
+}
+
+/// Código de invitación de un cliente en un comercio (uno por comercio: los puntos no se mezclan).
+model ReferralCode {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  code      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@map("referral_codes")
+}
+
+/// Invitación aplicada. Queda PENDING hasta la primera compra promocional del invitado en el comercio;
+/// en esa misma transacción pasa a COMPLETED y se acreditan los dos REFERRAL_BONUS.
+model Referral {
+  id                String         @id @default(uuid()) @db.Uuid
+  tenantId          String         @map("tenant_id") @db.Uuid
+  referrerId        String         @map("referrer_id") @db.Uuid
+  refereeId         String         @map("referee_id") @db.Uuid
+  code              String
+  status            ReferralStatus @default(PENDING)
+  /// Compra (QR) que completó el referido.
+  qualifyingClaimId String?        @unique @map("qualifying_claim_id") @db.Uuid
+  createdAt         DateTime       @default(now()) @map("created_at")
+  completedAt       DateTime?      @map("completed_at")
+
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  referrer        User           @relation("ReferralReferrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referee         User           @relation("ReferralReferee", fields: [refereeId], references: [id], onDelete: Cascade)
+  qualifyingClaim PurchaseClaim? @relation(fields: [qualifyingClaimId], references: [id], onDelete: SetNull)
+  bonusEntries    PointEntry[]
+
+  /// Un cliente solo puede ser referido una vez por comercio.
+  @@unique([tenantId, refereeId])
+  @@index([tenantId, referrerId, status])
+  @@map("referrals")
 }
