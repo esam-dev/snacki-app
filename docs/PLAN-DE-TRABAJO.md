@@ -91,7 +91,7 @@ Sincronización (`SyncService`):
 - `GET/POST/PATCH/DELETE /api/merchant/products` (acepta `imageUrl`: foto PNG/JPG/WebP como data URL, URL o ruta de assets; si la promo ya tiene ventas se archiva en vez de borrarse) (hecho)
 - `GET/POST/PATCH/DELETE /api/merchant/rewards` (igual, con `imageUrl`; se archiva si ya tiene canjes) (hecho)
 - **Sucursales y aprobaciones** ✅: el registro de comercio tiene dos pestañas. *Local nuevo* crea el comercio y deja la cuenta como **titular** (`staffRole = owner`); *Sucursal* se une a un comercio existente como **asistente** (`assistant`). Cuando un asistente crea, edita o elimina una promo o recompensa, el API no lo aplica: guarda un `ChangeRequest` (datos ya validados) y responde `202 {pending: true}`. Los titulares lo revisan en `GET /api/merchant/change-requests` y lo resuelven con `POST /change-requests/:id/approve` (aplica el cambio una sola vez) o `/reject` (motivo opcional); el asistente ve solo sus solicitudes. Los asistentes tampoco pueden editar los settings del local (`403 OWNER_ONLY`). Pendiente de definir: notificar al asistente cuando se resuelve y poder cancelar una solicitud propia.
-- `PATCH /api/merchant/settings` (`pointsExpireAt`, dirección, lat/lng, categoría, logo, **reglas de referidos**) (hecho: base; pendiente: referidos)
+- `PATCH /api/merchant/settings` (`pointsExpireAt`, dirección, lat/lng, categoría, logo, **reglas de referidos**) (hecho, incluye reglas de referidos: `referralEnabled`, `referrerBonusPoints`, `refereeBonusPoints`, `referralMaxPerUser`; no se puede activar sin al menos un bono)
 - `POST /api/merchant/qr` `{productId, quantity}` → `{claimId, token, qrContent, expiresAt, points}` (token compacto `S1.<claimId>.<exp>.<HMAC-SHA256>` firmado con `QR_SECRET`; el QR codifica `snacki://claim/<token>` con el logo de Snacki al centro) (hecho)
 - `GET /api/merchant/qr/:id` → `pending | claimed | expired` (la pantalla del QR muestra "escaneado") (hecho)
 - `POST /api/merchant/qr/:id/void` → anula un QR no canjeado (venta cancelada) (hecho)
@@ -106,12 +106,13 @@ Sincronización (`SyncService`):
 - `GET /api/tenants/nearby?lat=&lng=&radiusKm=` (comercios adheridos con distancia)
 - `GET /api/tenants/:slug` (promos vigentes + recompensas + si tiene referidos activos)
 - `POST /api/claims` `{token}` → acredita una vez (`UPDATE ... WHERE claimedAt IS NULL` en transacción + `point_entries.claim_id` único); `400` QR inválido, `403` QR propio, `409` ya usado, `410` vencido/anulado. ✅ (integrado en la app del cliente)
-  - **Integración referidos**: si existe un `Referral PENDING` del usuario en ese tenant y es su primera compra promocional válida, en la **misma transacción** se marca `COMPLETED` y se liquidan los `REFERRAL_BONUS`. Respuesta incluye `referralBonus` si aplicó.
+  - **Integración referidos**: si existe un `Referral PENDING` del usuario en ese tenant y es su primera compra promocional válida, en la **misma transacción** se marca `COMPLETED` y se liquidan los `REFERRAL_BONUS`. Respuesta incluye `referralBonus` si aplicó. ✅ (si el comercio apagó los referidos, el pendiente espera sin pagar)
 - `POST /api/sync/claims` `{ops:[{localId, token}]}` → resultado por op (usa el mismo `ClaimService`, por lo que también liquida referidos)
 - `GET /api/wallet` ✅ (saldo, próximo vencimiento y progreso a la siguiente recompensa por comercio) · `GET /api/wallet/movements` · `GET /api/wallet/:tenantId/movements` ✅
 - **Canje solo con QR del comercio** ✅: el comercio genera `POST /api/merchant/redeem-qr` `{rewardId}` (token `R1`, `snacki://redeem/…`, 10 min, un solo uso; `GET /redeem-qr/:id` muestra a quién entregar y el código; `POST /redeem-qr/:id/void`). El cliente escanea → `POST /api/redemptions/preview` `{token}` (recompensa, costo, saldo) → confirma → `POST /api/redemptions` `{token}`: bloquea sus puntos (`FOR UPDATE`), descuenta FIFO por vencimiento y crea el `Redemption` entregado, todo en una transacción. `409 INSUFFICIENT_POINTS` no toca nada; `409` ya usado; `410` vencido/anulado o recompensa no disponible. No existe canje sin QR.
-- **`POST /api/referrals/apply`** `{code}` → crea `Referral PENDING`; errores: código inválido, auto-referido, ya es cliente del comercio, ya fue referido, comercio sin referidos, tope alcanzado
-- **`GET /api/referrals/me`** → por comercio: mi código, referidos pendientes/completados, bono ganado
+- **`POST /api/referrals/apply`** `{code}` → crea `Referral PENDING`; errores: `404 REFERRAL_CODE_INVALID`, `409 REFERRAL_SELF`, `REFERRAL_MUTUAL` (código de alguien a quien invitaste), `REFERRAL_EXISTING_CLIENT`, `REFERRAL_ALREADY_REFERRED`, `REFERRALS_DISABLED`, `REFERRAL_LIMIT_REACHED` ✅
+- **`GET /api/referrals/me`** → por comercio con referidos activos: mi código (7 caracteres, se crea al consultar), bonos, `pending`, `completed`, `remainingInvites`, `bonusEarned` y `referredBy` (si llegué invitado) ✅
+- `GET /api/catalog/tenants` incluye `referral: {enabled, referrerBonusPoints, refereeBonusPoints}` por comercio ✅
 - `POST /api/devices` `{token, platform}` (registrar token push)
 
 ## 7. Plugins y librerías
@@ -139,7 +140,7 @@ Todas salen de `develop` y vuelven por PR a `develop` (revisa la otra persona). 
 | `chore/deploy-railway` | B | API + Postgres en Railway, `/health` responde, variables `JWT_SECRET`, `QR_SECRET`, `DATABASE_URL`, `CORS_ORIGINS`, Firebase | En curso |
 | `feat/merchant-qr` | A | Comercio genera QR de una promo vigente y lo muestra en pantalla | Hecho (falta PR) |
 | `feat/client-claims-wallet` | B | Escanear → `POST /claims` → saldo; wallet por comercio con progreso a recompensa y vencimientos; movimientos; canje de recompensas solo con QR del comercio | Hecho (PR) |
-| `feat/referrals-engine` | A | Migración `ReferralCode` + `Referral` + reglas en `Tenant`; `POST /referrals/apply`, `GET /referrals/me`; liquidación `REFERRAL_BONUS` dentro de `ClaimService`; settings de referidos en panel; pantalla "Invita y gana" en cliente; tests (auto-referido, doble referido, cliente existente, bono una sola vez, claim offline sincronizado) | Pendiente |
+| `feat/referrals-engine` | A | Migración `ReferralCode` + `Referral` + reglas en `Tenant`; `POST /referrals/apply`, `GET /referrals/me`; liquidación `REFERRAL_BONUS` dentro de `ClaimService`; settings de referidos en panel; pantalla "Invita y gana" en cliente; tests (auto-referido, doble referido, cliente existente, bono una sola vez, claim offline sincronizado) | Backend hecho; falta panel y pantalla cliente |
 | `feat/merchant-redemptions-stats` | A | Lista de canjes, marcar entregado, estadísticas con métricas de recompra y referidos | Pendiente |
 | `feat/client-redemptions` | B | Canjear recompensa con código; errores de saldo insuficiente y sin red | Cubierto por `feat/client-claims-wallet` (canje con QR) |
 | `feat/offline-sqlite-sync` | B | SQLite local, cola `pending_ops`, `SyncService`, indicador "sin conexión / por confirmar" | Pendiente |
