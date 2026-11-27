@@ -86,6 +86,8 @@ async function main() {
     const data = {
       name: t.name, category: t.category, address: t.address, latitude: t.latitude,
       longitude: t.longitude, logoUrl: t.logoUrl, pointsExpireAt: daysFromNow(90), isActive: true,
+      // Referidos activos en la demo: 100 pts para quien invita y para el invitado.
+      referralEnabled: true, referrerBonusPoints: 100, refereeBonusPoints: 100, referralMaxPerUser: 10,
     };
     const tenant = await prisma.tenant.upsert({ where: { slug: t.slug }, update: data, create: { slug: t.slug, ...data } });
     tenantIds[t.slug] = tenant.id;
