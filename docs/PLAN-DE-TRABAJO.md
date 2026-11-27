@@ -144,7 +144,7 @@ Todas salen de `develop` y vuelven por PR a `develop` (revisa la otra persona). 
 | `feat/merchant-redemptions-stats` | A | Lista de canjes y estadísticas por período con métricas de recompra y referidos (entrega inmediata vía QR de canje) | Hecho (PR) |
 | `feat/client-redemptions` | B | Canjear recompensa con código; errores de saldo insuficiente y sin red | Cubierto por `feat/client-claims-wallet` (canje con QR) |
 | `feat/offline-sqlite-sync` | B | SQLite local, cola `pending_ops`, `SyncService`, indicador "sin conexión / por confirmar" | Pendiente |
-| `feat/geolocation-map` | A | Mapa de comercios cercanos en Explorar, ubicación del local elegible en el mapa y mapa en la tienda | Hecho (pendiente de probar) |
+| `feat/geolocation-map` + `fix/geolocation-map` | A | Mapa de comercios cercanos en Explorar (orden por distancia), ubicación del local elegible en el mapa y mapa en la tienda con "Cómo llegar" | Hecho |
 | `feat/push-notifications` | A | Registro de token, panel para enviar notificación, cliente la recibe en Android; aviso de vencimiento de puntos (opcional) | Pendiente |
 | `chore/android-build` | B | `npx cap add android`, permisos, APK apuntando a Railway | Pendiente |
 | `fix/polish-ux-details` | A + B | Ver §9 | Pendiente |
