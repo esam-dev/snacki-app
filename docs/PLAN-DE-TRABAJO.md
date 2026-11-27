@@ -95,8 +95,8 @@ Sincronización (`SyncService`):
 - `POST /api/merchant/qr` `{productId, quantity}` → `{claimId, token, qrContent, expiresAt, points}` (token compacto `S1.<claimId>.<exp>.<HMAC-SHA256>` firmado con `QR_SECRET`; el QR codifica `snacki://claim/<token>` con el logo de Snacki al centro) (hecho)
 - `GET /api/merchant/qr/:id` → `pending | claimed | expired` (la pantalla del QR muestra "escaneado") (hecho)
 - `POST /api/merchant/qr/:id/void` → anula un QR no canjeado (venta cancelada) (hecho)
-- `GET /api/merchant/redemptions` · `PATCH /api/merchant/redemptions/:id/deliver`
-- `GET /api/merchant/stats` → puntos emitidos, canjes, clientes únicos, clientes recurrentes (2+ compras), promo más escaneada y **referidos** (pendientes, completados, clientes nuevos por referido, bono emitido, conversión)
+- `GET /api/merchant/redemptions?limit&before` → canjes del local (recompensa, cliente, código, puntos), paginados por cursor (hecho). No hay "marcar entregado": con el canje por QR el `Redemption` nace `DELIVERED` frente al comercio.
+- `GET /api/merchant/stats?range=7d|30d|90d|all` → puntos emitidos, canjes, clientes únicos, clientes recurrentes (2+ compras), promo más escaneada y **referidos** (pendientes, completados, clientes nuevos por referido, bono emitido, conversión) (hecho; pestaña "Estadísticas" del panel comercio)
 - `POST /api/merchant/notifications` `{title, body, productId?}` → push a sus clientes · `GET` historial
 
 **Cliente**
@@ -141,7 +141,7 @@ Todas salen de `develop` y vuelven por PR a `develop` (revisa la otra persona). 
 | `feat/merchant-qr` | A | Comercio genera QR de una promo vigente y lo muestra en pantalla | Hecho (falta PR) |
 | `feat/client-claims-wallet` | B | Escanear → `POST /claims` → saldo; wallet por comercio con progreso a recompensa y vencimientos; movimientos; canje de recompensas solo con QR del comercio | Hecho (PR) |
 | `feat/referrals-engine` | A | Migración `ReferralCode` + `Referral` + reglas en `Tenant`; `POST /referrals/apply`, `GET /referrals/me`; liquidación `REFERRAL_BONUS` dentro de `ClaimService`; settings de referidos en panel; pantalla "Invita y gana" en cliente; tests (auto-referido, doble referido, cliente existente, bono una sola vez, claim offline sincronizado) | Hecho: backend, ajustes en el panel (Configuración → Invita y gana) y pantalla "Invita y gana" (`/tabs/referidos`, accesos en home, perfil y tienda) |
-| `feat/merchant-redemptions-stats` | A | Lista de canjes, marcar entregado, estadísticas con métricas de recompra y referidos | Pendiente |
+| `feat/merchant-redemptions-stats` | A | Lista de canjes y estadísticas por período con métricas de recompra y referidos (entrega inmediata vía QR de canje) | Hecho (PR) |
 | `feat/client-redemptions` | B | Canjear recompensa con código; errores de saldo insuficiente y sin red | Cubierto por `feat/client-claims-wallet` (canje con QR) |
 | `feat/offline-sqlite-sync` | B | SQLite local, cola `pending_ops`, `SyncService`, indicador "sin conexión / por confirmar" | Pendiente |
 | `feat/geolocation-map` | A | Mapa de comercios cercanos en Explorar, ubicación del local elegible en el mapa y mapa en la tienda | Hecho (pendiente de probar) |
