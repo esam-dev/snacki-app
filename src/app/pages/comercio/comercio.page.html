@@ -112,10 +112,17 @@
       <button type="button" [class.active]="section === 'recompensas'" (click)="setSection('recompensas')">
         <app-icon name="gift" /> Recompensas <span class="tab-count">{{ rewards.length }}</span>
       </button>
+      <button type="button" [class.active]="section === 'estadisticas'" (click)="setSection('estadisticas')">
+        <app-icon name="chart" /> Estadísticas
+      </button>
       <button type="button" [class.active]="section === 'solicitudes'" (click)="setSection('solicitudes')">
         <app-icon name="clock" /> {{ esAsistente ? 'Mis cambios' : 'Solicitudes' }} @if (pendientesCambios > 0) { <span class="tab-count">{{ pendientesCambios }}</span> }
       </button>
     </nav>
+
+    @if (section === 'estadisticas') {
+      <app-estadisticas-comercio (aviso)="mostrar($event.texto, $event.tipo)" />
+    }
 
     @if (section === 'solicitudes') {
       <app-solicitudes-cambio

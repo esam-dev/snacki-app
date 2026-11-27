@@ -12,12 +12,18 @@ import {
 import { merchantService } from './merchant.service.js';
 import { changeRequestsService, type ChangeAction, type ChangeEntity } from './change-requests.service.js';
 import { getStaffRole, requireOwner } from './staff.js';
+import { merchantStatsService, STATS_RANGES } from './stats.service.js';
 import { z } from 'zod';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const rejectSchema = z.object({ reason: z.string().trim().max(300).optional() });
 const statusQuery = z.object({ status: z.enum(['PENDING', 'APPROVED', 'REJECTED']).optional() });
+const redemptionsQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  before: z.string().regex(UUID_RE).optional(),
+});
+const statsQuery = z.object({ range: z.enum(STATS_RANGES).default('30d') });
 
 export async function merchantRoutes(app: FastifyInstance) {
   // All merchant routes require auth + comercio role
@@ -126,6 +132,17 @@ export async function merchantRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     if (!UUID_RE.test(id)) return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'QR no encontrado' } });
     return reply.send({ data: await merchantService.voidRedeemQr(request.authUser?.tenantId, id) });
+  });
+
+  // Canjes y estadísticas
+  app.get('/redemptions', async (request, reply) => {
+    const { limit, before } = redemptionsQuery.parse(request.query);
+    return reply.send({ data: await merchantStatsService.listRedemptions(request.authUser?.tenantId, { limit, before }) });
+  });
+
+  app.get('/stats', async (request, reply) => {
+    const { range } = statsQuery.parse(request.query);
+    return reply.send({ data: await merchantStatsService.getStats(request.authUser?.tenantId, range) });
   });
 
   // Settings

@@ -8,6 +8,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
 import { SnackiMapComponent } from '../../shared/snacki-map/snacki-map.component';
 import { MerchantProduct, MerchantQr, MerchantQrStatus, MerchantReward, MerchantService, MerchantSettings, esPendiente } from '../../services/merchant.service';
 import { SolicitudesCambioComponent } from './solicitudes-cambio/solicitudes-cambio.component';
+import { EstadisticasComercioComponent } from './estadisticas-comercio/estadisticas-comercio.component';
 import QRCode from 'qrcode';
 import { addIcons } from 'ionicons';
 import { alertCircle, checkmarkCircle, close, informationCircle } from 'ionicons/icons';
@@ -30,7 +31,7 @@ const QR_POLL_MS = 4000;
 const QR_LOGO_SRC = 'assets/icon/qr-logo.png';
 const QR_SIZE = 640;
 const QR_LOGO_RATIO = 0.2;
-type Section = 'inicio' | 'promos' | 'recompensas' | 'solicitudes';
+type Section = 'inicio' | 'promos' | 'recompensas' | 'estadisticas' | 'solicitudes';
 type PromoStatus = 'activa' | 'programada' | 'finalizada' | 'pausada';
 
 interface SetupTask {
@@ -60,7 +61,7 @@ export const CATEGORIAS = [
   selector: 'app-comercio',
   templateUrl: './comercio.page.html',
   styleUrls: ['./comercio.page.scss'],
-  imports: [IonContent, IonFooter, IonHeader, IonToolbar, IonTitle, IonButtons, IonModal, IonSpinner, FormsModule, DecimalPipe, DatePipe, NgTemplateOutlet, IconComponent, SnackiMapComponent, SolicitudesCambioComponent],
+  imports: [IonContent, IonFooter, IonHeader, IonToolbar, IonTitle, IonButtons, IonModal, IonSpinner, FormsModule, DecimalPipe, DatePipe, NgTemplateOutlet, IconComponent, SnackiMapComponent, SolicitudesCambioComponent, EstadisticasComercioComponent],
 })
 export class ComercioPage {
   private auth = inject(AuthService);
