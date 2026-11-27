@@ -27,6 +27,7 @@ export const routes: Routes = [
       { path: 'explorar/:id', loadComponent: () => import('./pages/tienda/tienda.page').then((m) => m.TiendaPage) },
       { path: 'qr', loadComponent: () => import('./pages/qr/qr.page').then((m) => m.QrPage) },
       { path: 'puntos', loadComponent: () => import('./pages/puntos/puntos.page').then((m) => m.PuntosPage) },
+      { path: 'referidos', loadComponent: () => import('./pages/referidos/referidos.page').then((m) => m.ReferidosPage) },
       { path: 'perfil', loadComponent: () => import('./pages/perfil/perfil.page').then((m) => m.PerfilPage) },
       { path: '', redirectTo: 'home', pathMatch: 'full' },
     ],

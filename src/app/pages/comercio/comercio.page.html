@@ -418,6 +418,29 @@
         </p>
         <label class="field-label">Puntos expiran el</label>
         <input class="field-input" type="date" [(ngModel)]="settingsPointsExpireAt" />
+
+        <h3 class="field-section">Invita y gana (referidos)</h3>
+        <p class="field-note">
+          Tus clientes comparten su código. Cuando un cliente nuevo lo usa y hace su primera compra con promo,
+          los dos reciben estos puntos de bono en tu local.
+        </p>
+        <label class="field-switch">
+          <input type="checkbox" role="switch" [(ngModel)]="settingsReferralEnabled" />
+          <span class="switch-track" aria-hidden="true"></span>
+          <span>Referidos activos</span>
+        </label>
+        <div class="field-row">
+          <div>
+            <label class="field-label">Bono para quien invita</label>
+            <input class="field-input" type="number" min="0" step="1" [(ngModel)]="settingsReferrerBonus" [disabled]="!settingsReferralEnabled" />
+          </div>
+          <div>
+            <label class="field-label">Bono para el invitado</label>
+            <input class="field-input" type="number" min="0" step="1" [(ngModel)]="settingsRefereeBonus" [disabled]="!settingsReferralEnabled" />
+          </div>
+        </div>
+        <label class="field-label">Máximo de invitaciones por cliente</label>
+        <input class="field-input" type="number" min="1" step="1" [(ngModel)]="settingsReferralMax" [disabled]="!settingsReferralEnabled" />
       </ion-content>
       <ion-footer class="modal-footer">
         <button class="btn btn-secondary" type="button" (click)="cerrarModal()">Cancelar</button>

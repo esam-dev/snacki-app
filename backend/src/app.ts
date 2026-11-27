@@ -9,6 +9,7 @@ import { claimsRoutes } from './modules/claims/claims.routes.js';
 import { catalogRoutes } from './modules/catalog/catalog.routes.js';
 import { walletRoutes } from './modules/wallet/wallet.routes.js';
 import { redemptionsRoutes } from './modules/redemptions/redemptions.routes.js';
+import { referralsRoutes } from './modules/referrals/referrals.routes.js';
 
 export async function buildApp() {
   // 2 MB: deja margen para logos enviados como data URL (ver imageRefSchema).
@@ -33,6 +34,7 @@ export async function buildApp() {
     api.register(catalogRoutes, { prefix: '/catalog' });
     api.register(walletRoutes, { prefix: '/wallet' });
     api.register(redemptionsRoutes, { prefix: '/redemptions' });
+    api.register(referralsRoutes, { prefix: '/referrals' });
   }, { prefix: '/api' });
 
   return app;

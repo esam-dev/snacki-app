@@ -299,6 +299,18 @@ export const merchantService = {
     if (input.longitude !== undefined) data.longitude = input.longitude;
     if (input.logoUrl !== undefined) data.logoUrl = input.logoUrl || null;
     if (input.pointsExpireAt !== undefined) data.pointsExpireAt = input.pointsExpireAt ? new Date(input.pointsExpireAt) : null;
+    if (input.referrerBonusPoints !== undefined) data.referrerBonusPoints = input.referrerBonusPoints;
+    if (input.refereeBonusPoints !== undefined) data.refereeBonusPoints = input.refereeBonusPoints;
+    if (input.referralMaxPerUser !== undefined) data.referralMaxPerUser = input.referralMaxPerUser;
+    if (input.referralEnabled !== undefined) {
+      // Activar referidos sin ningún bono no tendría sentido para el cliente.
+      const referrer = input.referrerBonusPoints ?? existing.referrerBonusPoints;
+      const referee = input.refereeBonusPoints ?? existing.refereeBonusPoints;
+      if (input.referralEnabled && referrer + referee <= 0) {
+        throw new AppError(400, 'REFERRAL_BONUS_REQUIRED', 'Define al menos un bono (para quien invita o para el invitado) antes de activar los referidos.');
+      }
+      data.referralEnabled = input.referralEnabled;
+    }
 
     return prisma.tenant.update({ where: { id: tid }, data });
   },

@@ -43,7 +43,8 @@ export class QrPage {
       const r = await this.wallet.escanear(valor);
       if (r.ok) {
         const saldo = r.saldo !== null ? ` Saldo en ${r.comercio}: ${r.saldo.toLocaleString('es')} PTS.` : '';
-        await this.mostrar(`¡Compra registrada! Sumaste ${r.puntos.toLocaleString('es')} puntos en ${r.comercio}.${saldo}`);
+        const bono = r.bonoReferido > 0 ? ` Además ganaste ${r.bonoReferido.toLocaleString('es')} pts de bono por tu invitación.` : '';
+        await this.mostrar(`¡Compra registrada! Sumaste ${r.puntos.toLocaleString('es')} puntos en ${r.comercio}.${bono}${saldo}`);
         this.router.navigateByUrl('/tabs/puntos');
       } else {
         await this.mostrar(r.mensaje);

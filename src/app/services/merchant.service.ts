@@ -39,6 +39,11 @@ export interface MerchantSettings {
   longitude?: number | null;
   logoUrl?: string | null;
   pointsExpireAt?: string | null;
+  /** Reglas de "Invita y gana": bono para quien invita y para el invitado, y tope por cliente. */
+  referralEnabled?: boolean;
+  referrerBonusPoints?: number;
+  refereeBonusPoints?: number;
+  referralMaxPerUser?: number;
   isActive: boolean;
 }
 
@@ -183,7 +188,8 @@ export class MerchantService {
     return res.data.settings;
   }
 
-  async updateSettings(payload: Partial<{ name: string; category: string; address?: string | null; latitude?: number | null; longitude?: number | null; logoUrl?: string | null; pointsExpireAt?: string | null }>): Promise<MerchantSettings> {
+  async updateSettings(payload: Partial<{ name: string; category: string; address?: string | null; latitude?: number | null; longitude?: number | null; logoUrl?: string | null; pointsExpireAt?: string | null;
+    referralEnabled: boolean; referrerBonusPoints: number; refereeBonusPoints: number; referralMaxPerUser: number }>): Promise<MerchantSettings> {
     const res = await firstValueFrom(this.http.patch<{ data: { settings: MerchantSettings } }>(`${this.base}/settings`, payload));
     return res.data.settings;
   }

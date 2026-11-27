@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { QrTokenError, verifyRedeemToken } from '../../lib/qr-token.js';
+import { SPENDABLE_TYPES } from '../wallet/spendable.js';
 
 export const REDEEM_ERRORS = {
   invalid: () => new AppError(400, 'QR_INVALID', 'Este QR de canje no es válido.'),
@@ -33,10 +34,10 @@ function requireUser(userId: string | undefined): string {
   return userId;
 }
 
-/** Saldo vigente del cliente en un comercio (EARN no vencidos). */
+/** Saldo vigente del cliente en un comercio (EARN y bonos de referido no vencidos). */
 async function balanceOf(db: Prisma.TransactionClient | typeof prisma, userId: string, tenantId: string, now: Date) {
   const agg = await db.pointEntry.aggregate({
-    where: { userId, tenantId, type: 'EARN', remaining: { gt: 0 }, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+    where: { userId, tenantId, type: { in: [...SPENDABLE_TYPES] }, remaining: { gt: 0 }, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
     _sum: { remaining: true },
   });
   return agg._sum.remaining ?? 0;
@@ -104,7 +105,7 @@ export const redemptionsService = {
         const entries = await tx.$queryRaw<Array<{ id: string; remaining: number }>>`
           SELECT id, remaining FROM point_entries
           WHERE user_id = ${uid}::uuid AND tenant_id = ${qr.tenantId}::uuid
-            AND type = 'EARN' AND remaining > 0 AND (expires_at IS NULL OR expires_at > ${now})
+            AND type IN ('EARN', 'REFERRAL_BONUS') AND remaining > 0 AND (expires_at IS NULL OR expires_at > ${now})
           ORDER BY expires_at ASC NULLS LAST, created_at ASC
           FOR UPDATE`;
 

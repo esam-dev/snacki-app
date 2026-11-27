@@ -4,6 +4,7 @@ import { env } from '../../config/env.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { publicImageUrl } from '../catalog/catalog.service.js';
 import { summarizeTenantWallet } from './wallet.summary.js';
+import { SPENDABLE_TYPES } from './spendable.js';
 
 const MOVEMENTS_DEFAULT_LIMIT = 50;
 
@@ -15,7 +16,7 @@ function requireUser(userId: string | undefined): string {
 export const walletService = {
   /**
    * Saldo del cliente en cada comercio activo. Los puntos de un comercio solo sirven en ese comercio.
-   * Saldo = `remaining` de los EARN no vencidos (los canjes ya los descuentan de `remaining`).
+   * Saldo = `remaining` de los EARN y REFERRAL_BONUS no vencidos (los canjes ya los descuentan de `remaining`).
    */
   async getWallet(userId: string | undefined) {
     const uid = requireUser(userId);
@@ -27,7 +28,7 @@ export const walletService = {
         id: true, slug: true, name: true, logoUrl: true, updatedAt: true,
         rewards: { where: { isActive: true, deletedAt: null }, select: { id: true, name: true, cost: true } },
         pointEntries: {
-          where: { userId: uid, type: 'EARN', remaining: { gt: 0 } },
+          where: { userId: uid, type: { in: [...SPENDABLE_TYPES] }, remaining: { gt: 0 } },
           select: { remaining: true, expiresAt: true },
         },
       },
@@ -73,6 +74,7 @@ export const walletService = {
     return entries.map((e) => {
       let description: string;
       if (e.type === 'REDEEM') description = e.reward?.name ?? 'Canje de recompensa';
+      else if (e.type === 'REFERRAL_BONUS') description = 'Bono por referido';
       else if (e.claim) description = e.claim.quantity > 1 ? `${e.claim.quantity} × ${e.claim.product.name}` : e.claim.product.name;
       else description = 'Puntos acumulados';
 
@@ -86,8 +88,8 @@ export const walletService = {
         description,
         createdAt: e.createdAt,
         expiresAt: e.expiresAt,
-        // Un EARN con puntos sin usar y fecha pasada ya no cuenta en el saldo.
-        expired: e.type === 'EARN' && e.remaining > 0 && !!e.expiresAt && e.expiresAt <= now,
+        // Puntos sin usar con fecha pasada ya no cuentan en el saldo.
+        expired: e.type !== 'REDEEM' && e.remaining > 0 && !!e.expiresAt && e.expiresAt <= now,
       };
     });
   },

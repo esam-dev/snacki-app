@@ -122,6 +122,10 @@ export class ComercioPage {
   settingsLng: number | string | null = null;
   settingsLogoUrl = '';
   settingsPointsExpireAt = '';
+  settingsReferralEnabled = false;
+  settingsReferrerBonus: number | string = 0;
+  settingsRefereeBonus: number | string = 0;
+  settingsReferralMax: number | string = 10;
   procesandoLogo = false;
 
   // QR de compra
@@ -299,6 +303,10 @@ export class ComercioPage {
     this.settingsLng = s?.longitude ?? null;
     this.settingsLogoUrl = s?.logoUrl || '';
     this.settingsPointsExpireAt = s?.pointsExpireAt ? s.pointsExpireAt.slice(0, 10) : '';
+    this.settingsReferralEnabled = !!s?.referralEnabled;
+    this.settingsReferrerBonus = s?.referrerBonusPoints ?? 0;
+    this.settingsRefereeBonus = s?.refereeBonusPoints ?? 0;
+    this.settingsReferralMax = s?.referralMaxPerUser ?? 10;
     this.actualizarMapaSettings();
     this.modal = 'settings';
   }
@@ -690,6 +698,11 @@ export class ComercioPage {
       await this.mostrar('Completa latitud y longitud, o elige el punto en el mapa.');
       return;
     }
+    const referidos = this.reglasReferidos();
+    if (typeof referidos === 'string') {
+      await this.mostrar(referidos);
+      return;
+    }
     this.saving = true;
     try {
       await this.merchant.updateSettings({
@@ -700,6 +713,7 @@ export class ComercioPage {
         longitude: this.settingsLng === '' || this.settingsLng === null ? null : Number(this.settingsLng),
         logoUrl: this.settingsLogoUrl.trim() || null,
         pointsExpireAt: this.settingsPointsExpireAt ? new Date(this.settingsPointsExpireAt).toISOString() : null,
+        ...referidos,
       });
       this.modal = null;
       await this.loadAll();
@@ -710,6 +724,23 @@ export class ComercioPage {
       this.saving = false;
       this.cdr.markForCheck();
     }
+  }
+
+  /** Valida las reglas de referidos del formulario; devuelve el mensaje de error si algo no cuadra. */
+  private reglasReferidos() {
+    const entero = (v: number | string) => (v === '' || v === null ? 0 : Number(v));
+    const referrerBonusPoints = entero(this.settingsReferrerBonus);
+    const refereeBonusPoints = entero(this.settingsRefereeBonus);
+    const referralMaxPerUser = entero(this.settingsReferralMax);
+    const valido = (n: number, min: number, max: number) => Number.isInteger(n) && n >= min && n <= max;
+    if (!valido(referrerBonusPoints, 0, 100_000) || !valido(refereeBonusPoints, 0, 100_000)) {
+      return 'Los bonos de referidos deben ser números enteros entre 0 y 100.000.';
+    }
+    if (!valido(referralMaxPerUser, 1, 1000)) return 'El máximo de invitaciones por cliente debe estar entre 1 y 1.000.';
+    if (this.settingsReferralEnabled && referrerBonusPoints + refereeBonusPoints <= 0) {
+      return 'Para activar los referidos define al menos un bono (para quien invita o para el invitado).';
+    }
+    return { referralEnabled: this.settingsReferralEnabled, referrerBonusPoints, refereeBonusPoints, referralMaxPerUser };
   }
 
   usarMiUbicacion() {

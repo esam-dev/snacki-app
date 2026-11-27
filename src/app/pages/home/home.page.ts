@@ -1,9 +1,9 @@
 import { Component, OnInit, effect, inject, untracked } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { IonContent, IonIcon, IonSearchbar } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { locationOutline, notificationsOutline, qrCodeOutline } from 'ionicons/icons';
+import { giftOutline, locationOutline, notificationsOutline, qrCodeOutline } from 'ionicons/icons';
 import { Local, Producto, Promo, StoreService } from '../../services/store.service';
 import { SnackiHeaderComponent } from '../../shared/snacki-header/snacki-header.component';
 import { AuthService } from '../../services/auth.service';
@@ -22,7 +22,7 @@ interface PromoHome extends Promo {
   selector: 'app-home',
   templateUrl: './home.page.html',
   styleUrls: ['./home.page.scss'],
-  imports: [IonContent, IonIcon, IonSearchbar, DecimalPipe, SnackiHeaderComponent],
+  imports: [IonContent, IonIcon, IonSearchbar, DecimalPipe, RouterLink, SnackiHeaderComponent],
 })
 export class HomePage implements OnInit {
   private stores = inject(StoreService);
@@ -41,7 +41,7 @@ export class HomePage implements OnInit {
   }
 
   constructor() {
-    addIcons({ qrCodeOutline, notificationsOutline, locationOutline });
+    addIcons({ qrCodeOutline, notificationsOutline, locationOutline, giftOutline });
     // Cada vez que se descarga el catálogo del servidor se vuelven a leer los datos de la pantalla.
     effect(() => {
       this.stores.catalogoVersion();
