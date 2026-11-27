@@ -1,8 +1,9 @@
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { IonButton, IonCheckbox, IonContent, IonIcon, IonInput, NavController } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { eyeOutline, eyeOffOutline } from 'ionicons/icons';
+import { eyeOutline, eyeOffOutline, giftOutline } from 'ionicons/icons';
 import { SnackiHeaderComponent } from '../../shared/snacki-header/snacki-header.component';
 import { AuthService } from '../../services/auth.service';
 
@@ -10,7 +11,7 @@ import { AuthService } from '../../services/auth.service';
   selector: 'app-perfil',
   templateUrl: './perfil.page.html',
   styleUrls: ['./perfil.page.scss'],
-  imports: [IonContent, IonInput, IonButton, IonCheckbox, IonIcon, FormsModule, SnackiHeaderComponent],
+  imports: [IonContent, IonInput, IonButton, IonCheckbox, IonIcon, FormsModule, RouterLink, SnackiHeaderComponent],
 })
 export class PerfilPage {
   private auth = inject(AuthService);
@@ -24,7 +25,7 @@ export class PerfilPage {
   verCedula = false;
 
   constructor() {
-    addIcons({ eyeOutline, eyeOffOutline });
+    addIcons({ eyeOutline, eyeOffOutline, giftOutline });
   }
 
   get cedulaMostrada(): string {

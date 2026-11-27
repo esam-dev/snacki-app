@@ -41,6 +41,10 @@ export class TiendaPage implements OnInit {
     if (!this.local) this.router.navigateByUrl('/tabs/explorar');
   }
 
+  invitar() {
+    if (this.local) this.router.navigate(['/tabs/referidos'], { queryParams: { local: this.local.id } });
+  }
+
   mostrarQr() {
     this.router.navigateByUrl('/tabs/qr');
   }

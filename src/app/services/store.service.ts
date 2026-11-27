@@ -42,6 +42,8 @@ export interface Local {
   siguienteRecompensa?: WalletComercio['siguiente'];
   puntosPorVencer?: number;
   canjeables?: number;
+  /** Programa "Invita y gana" del comercio (solo con catálogo del servidor). */
+  referidos?: { activo: boolean; bonoInvita: number; bonoInvitado: number };
 }
 
 interface ApiPromo {
@@ -53,6 +55,7 @@ interface ApiTenant {
   id: string; slug: string; name: string; category: string; address: string | null;
   latitude?: number | null; longitude?: number | null;
   logoUrl: string | null; pointsExpireAt: string | null; products: ApiPromo[]; rewards: ApiReward[];
+  referral?: { enabled: boolean; referrerBonusPoints: number; refereeBonusPoints: number };
 }
 
 export interface MovimientoPuntos {
@@ -469,6 +472,9 @@ export class StoreService {
       direccion: tenant.address ?? undefined,
       latitud: tenant.latitude ?? null,
       longitud: tenant.longitude ?? null,
+      referidos: tenant.referral
+        ? { activo: tenant.referral.enabled, bonoInvita: tenant.referral.referrerBonusPoints, bonoInvitado: tenant.referral.refereeBonusPoints }
+        : undefined,
       productos: (tenant.rewards ?? []).map((reward) => ({
         id: reward.id,
         nombre: reward.name,
