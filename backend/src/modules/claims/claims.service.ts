@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { QrTokenError, verifyQrToken } from '../../lib/qr-token.js';
+import { referralsService } from '../referrals/referrals.service.js';
 
 export const CLAIM_ERRORS = {
   invalid: () => new AppError(400, 'QR_INVALID', 'Este QR no es válido.'),
@@ -17,7 +18,10 @@ export const CLAIM_ERRORS = {
  *    es atómico en Postgres (el segundo espera el bloqueo de fila y no encuentra nada que actualizar).
  * 3. Segunda barrera: `point_entries.claim_id` es único, así que nunca puede haber dos EARN por QR.
  * 4. Los puntos salen del claim guardado en el servidor, no del contenido del QR.
- * Todo corre en una transacción: o se marca usado y se acreditan los puntos, o no pasa nada.
+ * 5. Si el cliente llegó con un código de invitación, esta compra completa el referido y acredita
+ *    los dos REFERRAL_BONUS (ver `referralsService.settleOnClaim`).
+ * Todo corre en una transacción: o se marca usado y se acreditan los puntos (y el bono), o no pasa nada.
+ * Un QR escaneado sin conexión y sincronizado después pasa por aquí igual, así que también liquida.
  */
 export const claimsService = {
   async redeem(userId: string | undefined, token: string) {
@@ -36,7 +40,12 @@ export const claimsService = {
         const claim = await tx.purchaseClaim.findUnique({
           where: { id: claimId },
           include: {
-            tenant: { select: { id: true, name: true, pointsExpireAt: true, isActive: true } },
+            tenant: {
+              select: {
+                id: true, name: true, pointsExpireAt: true, isActive: true,
+                referralEnabled: true, referrerBonusPoints: true, refereeBonusPoints: true,
+              },
+            },
             product: { select: { id: true, name: true } },
           },
         });
@@ -66,6 +75,10 @@ export const claimsService = {
           },
         });
 
+        const referralBonus = await referralsService.settleOnClaim(tx, {
+          userId, claimId: claim.id, tenant: claim.tenant, expiresAt: pointsExpireAt, now,
+        });
+
         return {
           claimId: claim.id,
           points: claim.points,
@@ -74,6 +87,7 @@ export const claimsService = {
           product: claim.product,
           pointsExpireAt: entry.expiresAt,
           claimedAt: now,
+          referralBonus,
         };
       });
     } catch (e) {
