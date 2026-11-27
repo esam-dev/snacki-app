@@ -1,4 +1,4 @@
-import { Component, OnInit, effect, inject, untracked } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, effect, inject, untracked } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AlertController, IonButton, IonContent } from '@ionic/angular';
@@ -15,6 +15,8 @@ export class TiendaPage implements OnInit {
   private route = inject(ActivatedRoute);
   private stores = inject(StoreService);
   private router = inject(Router);
+  // App zoneless: los datos llegan por effects y promesas, así que hay que marcar la vista para repintar.
+  private cdr = inject(ChangeDetectorRef);
   private alert = inject(AlertController);
 
   local?: Local = this.stores.getById(this.route.snapshot.paramMap.get('id'));
@@ -39,6 +41,7 @@ export class TiendaPage implements OnInit {
   private cargarLocal() {
     this.local = this.stores.getById(this.route.snapshot.paramMap.get('id'));
     if (!this.local) this.router.navigateByUrl('/tabs/explorar');
+    this.cdr.markForCheck();
   }
 
   invitar() {

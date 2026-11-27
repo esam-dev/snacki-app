@@ -1,4 +1,4 @@
-import { Component, OnInit, effect, inject, untracked } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, effect, inject, untracked } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { IonContent, IonIcon, IonSearchbar } from '@ionic/angular';
@@ -27,6 +27,8 @@ interface Filtro { id: string; nombre: string; }
 export class ExplorarPage implements OnInit {
   private stores = inject(StoreService);
   private router = inject(Router);
+  // App zoneless: los datos llegan por effects y promesas, así que hay que marcar la vista para repintar.
+  private cdr = inject(ChangeDetectorRef);
 
   locales: Local[] = [];
   resultados: Local[] = [];
@@ -95,5 +97,6 @@ export class ExplorarPage implements OnInit {
       .filter((l) => !this.busqueda || l.nombre.toLowerCase().includes(this.busqueda) || (l.direccion ?? '').toLowerCase().includes(this.busqueda))
       // Primero donde el cliente ya tiene puntos.
       .sort((a, b) => b.puntos - a.puntos || a.nombre.localeCompare(b.nombre));
+    this.cdr.markForCheck();
   }
 }
