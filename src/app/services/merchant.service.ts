@@ -78,6 +78,34 @@ export interface ChangeRequest {
   reviewedBy: { id: string; fullName: string } | null;
 }
 
+/** Canje de una recompensa en el local (se crea ya entregado al escanear el QR de canje). */
+export interface MerchantRedemption {
+  id: string;
+  code: string;
+  cost: number;
+  status: 'PENDING' | 'DELIVERED';
+  createdAt: string;
+  deliveredAt: string | null;
+  reward: { id: string; name: string };
+  customerName: string;
+}
+
+export type StatsRange = '7d' | '30d' | '90d' | 'all';
+
+export interface MerchantStats {
+  range: StatsRange;
+  since: string | null;
+  pointsIssued: number;
+  redemptions: number;
+  pointsRedeemed: number;
+  purchases: number;
+  uniqueCustomers: number;
+  /** Clientes con 2+ compras escaneadas en el período. */
+  returningCustomers: number;
+  topPromo: { id: string; name: string; scans: number } | null;
+  referrals: { pending: number; completed: number; bonusIssued: number; conversion: number | null };
+}
+
 /** Respuesta 202 del servidor cuando quien guarda es un asistente: el cambio aún no se aplicó. */
 export interface PendingChange { pending: true; request: ChangeRequest; }
 
@@ -209,5 +237,22 @@ export class MerchantService {
 
   async rejectChange(id: string, reason?: string): Promise<void> {
     await firstValueFrom(this.http.post(`${this.base}/change-requests/${id}/reject`, { reason: reason?.trim() || undefined }));
+  }
+
+  // Canjes y estadísticas
+  /** Canjes del local, del más reciente al más antiguo. `before` = `nextCursor` de la página anterior. */
+  async listRedemptions(opts: { limit?: number; before?: string } = {}): Promise<{ redemptions: MerchantRedemption[]; nextCursor: string | null }> {
+    const params: Record<string, string> = {};
+    if (opts.limit) params['limit'] = String(opts.limit);
+    if (opts.before) params['before'] = opts.before;
+    const res = await firstValueFrom(this.http.get<{ data: { redemptions: MerchantRedemption[]; nextCursor: string | null } }>(
+      `${this.base}/redemptions`, { params },
+    ));
+    return res.data;
+  }
+
+  async getStats(range: StatsRange = '30d'): Promise<MerchantStats> {
+    const res = await firstValueFrom(this.http.get<{ data: MerchantStats }>(`${this.base}/stats`, { params: { range } }));
+    return res.data;
   }
 }
