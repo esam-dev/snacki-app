@@ -1,8 +1,8 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { TimeoutError, firstValueFrom, timeout } from 'rxjs';
-import { environment } from '../../environments/environment';
 import { ApiResponse, AuthSessionData, LoginPayload, MeSessionData, RegisterPayload, SessionUser, UserRole } from '../models/auth.models';
+import { AppConfigService } from './app-config.service';
 import { TokenStorageService } from './token-storage.service';
 
 export type TipoCuenta = UserRole;
@@ -16,6 +16,7 @@ const AUTH_REQUEST_TIMEOUT_MS = 15_000;
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly tokenStorage = inject(TokenStorageService);
+  private readonly config = inject(AppConfigService);
   private readonly _currentUser = signal<SessionUser | null>(null);
   readonly authStatus = signal<'unknown' | 'authenticated' | 'anonymous'>('unknown');
   readonly currentUserSignal = this._currentUser.asReadonly();
@@ -33,7 +34,7 @@ export class AuthService {
         this.clearLegacy();
         const token = await this.tokenStorage.getToken();
         if (!token) return this.clearSession();
-        const res = await firstValueFrom(this.http.get<ApiResponse<MeSessionData>>(`${environment.apiBaseUrl}/api/auth/me`));
+        const res = await firstValueFrom(this.http.get<ApiResponse<MeSessionData>>(`${this.config.apiBaseUrl}/api/auth/me`));
         this._currentUser.set(this.toSession(res.data.user, res.data.membership));
         this.authStatus.set('authenticated');
       } catch {
@@ -54,7 +55,7 @@ export class AuthService {
     const payload: LoginPayload = { identifier: identifier.trim(), password, accountType };
     if (!payload.identifier || !payload.password.trim()) return { success: false, message: 'Completa tu usuario/correo y contraseña.' };
     try {
-      const res = await firstValueFrom(this.http.post<ApiResponse<AuthSessionData>>(`${environment.apiBaseUrl}/api/auth/login`, payload).pipe(timeout(AUTH_REQUEST_TIMEOUT_MS)));
+      const res = await firstValueFrom(this.http.post<ApiResponse<AuthSessionData>>(`${this.config.apiBaseUrl}/api/auth/login`, payload).pipe(timeout(AUTH_REQUEST_TIMEOUT_MS)));
       await this.applySession(res.data);
       return { success: true };
     } catch (err) { return this.mapError(err, 'No se pudo iniciar sesión.'); }
@@ -80,7 +81,7 @@ export class AuthService {
     if (payload.businessMode === 'new' && !payload.tenantName) return { success: false, message: 'Escribe el nombre de tu local.' };
     if (payload.businessMode === 'branch' && !payload.tenantId) return { success: false, message: 'Selecciona el comercio asociado.' };
     try {
-      const res = await firstValueFrom(this.http.post<ApiResponse<AuthSessionData>>(`${environment.apiBaseUrl}/api/auth/register`, payload).pipe(timeout(AUTH_REQUEST_TIMEOUT_MS)));
+      const res = await firstValueFrom(this.http.post<ApiResponse<AuthSessionData>>(`${this.config.apiBaseUrl}/api/auth/register`, payload).pipe(timeout(AUTH_REQUEST_TIMEOUT_MS)));
       await this.applySession(res.data);
       return { success: true };
     } catch (err) { return this.mapError(err, 'No se pudo crear la cuenta.'); }

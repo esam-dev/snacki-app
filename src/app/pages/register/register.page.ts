@@ -6,9 +6,9 @@ import { IonButton, IonCheckbox, IonContent, IonIcon, IonInput, IonSelect, IonSe
 import { addIcons } from 'ionicons';
 import { eyeOffOutline, eyeOutline } from 'ionicons/icons';
 import { firstValueFrom } from 'rxjs';
-import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../../models/auth.models';
 import { SnackiHeaderComponent } from '../../shared/snacki-header/snacki-header.component';
+import { AppConfigService } from '../../services/app-config.service';
 import { AuthService } from '../../services/auth.service';
 
 interface TenantOption { id: string; name: string; slug: string; }
@@ -34,6 +34,7 @@ export class RegisterPage implements OnInit {
   private auth = inject(AuthService);
   private route = inject(ActivatedRoute);
   private http = inject(HttpClient);
+  private config = inject(AppConfigService);
   private returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') ?? '';
 
   tipoCuenta: 'cliente' | 'comercio' = this.route.snapshot.queryParamMap.get('tipo') === 'comercio' ? 'comercio' : 'cliente';
@@ -53,7 +54,7 @@ export class RegisterPage implements OnInit {
   async cargarLocales() {
     this.cargandoLocales = true;
     try {
-      const res = await firstValueFrom(this.http.get<ApiResponse<{ tenants: TenantOption[] }>>(`${environment.apiBaseUrl}/api/tenants`));
+      const res = await firstValueFrom(this.http.get<ApiResponse<{ tenants: TenantOption[] }>>(`${this.config.apiBaseUrl}/api/tenants`));
       this.locales = (res.data?.tenants || []).filter((t) => t.slug !== 'snacki');
     } catch { this.locales = []; } finally { this.cargandoLocales = false; this.cdr.markForCheck(); }
   }

@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom, timeout } from 'rxjs';
-import { environment } from '../../environments/environment';
+import { AppConfigService } from './app-config.service';
 import { AuthService } from './auth.service';
 import { emptyRecord, readJson, writeJson } from './demo-storage';
 import { WalletComercio, WalletService } from './wallet.service';
@@ -88,6 +88,7 @@ const CATALOGO_TIMEOUT_MS = 10_000;
 export class StoreService {
   private auth = inject(AuthService);
   private http = inject(HttpClient);
+  private config = inject(AppConfigService);
   private wallet = inject(WalletService);
 
   private readonly versionCatalogo = signal(0);
@@ -135,7 +136,7 @@ export class StoreService {
       try {
         const res = await firstValueFrom(
           this.http
-            .get<{ data: { tenants: ApiTenant[] } }>(`${environment.apiBaseUrl}/api/catalog/tenants`)
+            .get<{ data: { tenants: ApiTenant[] } }>(`${this.config.apiBaseUrl}/api/catalog/tenants`)
             .pipe(timeout(CATALOGO_TIMEOUT_MS)),
         );
         this.catalogoRemoto = (res.data?.tenants ?? []).map((tenant) => this.mapearTenant(tenant));
@@ -490,7 +491,7 @@ export class StoreService {
   /** Las fotos subidas por el comercio se sirven desde el backend (`/api/...`); las demás se usan tal cual. */
   private resolverImagen(url: string | null | undefined): string {
     if (!url) return '';
-    return url.startsWith('/api/') ? `${environment.apiBaseUrl}${url}` : url;
+    return url.startsWith('/api/') ? `${this.config.apiBaseUrl}${url}` : url;
   }
 
   private leerCatalogoCache(): Local[] | null {

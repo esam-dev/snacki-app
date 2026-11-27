@@ -18,7 +18,7 @@ Plan de trabajo, ramas y responsables: [docs/PLAN-DE-TRABAJO.md](docs/PLAN-DE-TR
 | Backend | Node.js + TypeScript + Fastify 5 |
 | Base de datos | PostgreSQL 16 + Prisma 6 |
 | Autenticación | JWT |
-| Despliegue | Railway (API + Postgres) |
+| Despliegue | Firebase Hosting (web) + Railway (API + Postgres) |
 
 ## Estructura
 
@@ -106,7 +106,7 @@ En otra terminal, desde la raíz del proyecto:
 npm start
 ```
 
-Abre http://localhost:4200. La app llama a la API definida en `src/environments/environment.ts` (`apiBaseUrl: 'http://localhost:3000'`).
+Abre http://localhost:4200. La app lee la URL de la API desde `src/assets/config.json` (`apiBaseUrl: 'http://localhost:3000'`).
 
 **Usuarios de prueba** (creados por el seed, contraseña `Demo1234!`):
 
@@ -132,8 +132,8 @@ npx cap sync android
 npx cap open android       # abre Android Studio → Run ▶
 ```
 
-- El celular **no puede usar `localhost`** de tu PC. Cambia `apiBaseUrl` en `src/environments/environment.prod.ts` a la URL de Railway o a la IP de tu PC en la red (ej. `http://192.168.1.10:3000`) y agrega ese origen a `CORS_ORIGIN`.
-- Después de cada cambio en el código: `npm run build` y `npx cap sync android`.
+- El celular **no puede usar `localhost`** de tu PC. Después del build, sobrescribe `www/assets/config.json` con la URL de Railway o con la IP de tu PC en la red (ej. `http://192.168.1.10:3000`) y agrega ese origen a `CORS_ORIGIN`. No commitees ese archivo generado.
+- Después de cada cambio en el código: `npm run build:prod`, ajusta `www/assets/config.json` si hace falta y corre `npx cap sync android`.
 
 ## Comandos útiles
 
@@ -141,6 +141,8 @@ npx cap open android       # abre Android Studio → Run ▶
 |---|---|---|
 | raíz | `npm start` | App en modo desarrollo |
 | raíz | `npm run build` | Compila la app en `www/` |
+| raíz | `npm run build:prod` | Compila la app para producción en `www/` |
+| raíz | `npm run config:production` | Escribe `www/assets/config.json` desde `RAILWAY_API_URL` |
 | raíz | `npm test` | Tests del frontend |
 | raíz | `npm run lint` | Lint |
 | backend | `npm run dev` | API con recarga automática |
@@ -156,7 +158,41 @@ npx cap open android       # abre Android Studio → Run ▶
 - **Puerto 5432 ocupado**: ya tienes otro Postgres instalado. Detenlo o cambia el puerto en `docker-compose.yml` y en `DATABASE_URL`.
 - **`The migration ... was modified after it was applied`**: tu base local tiene una versión vieja de la migración inicial. Desde `backend/`, corre `npx prisma migrate reset` (borra la base local y vuelve a crearla con el seed).
 - **Error de CORS en la app**: agrega el origen de la app a `CORS_ORIGIN` y reinicia el backend.
-- **Login falla en el celular**: `apiBaseUrl` apunta a `localhost`. Mira la sección de Android.
+- **Login falla en el celular**: `www/assets/config.json` apunta a `localhost`. Mira la sección de Android.
+
+## Despliegue a producción
+
+La web se sirve desde **Firebase Hosting** y llama a la API de **Railway**; la API usa PostgreSQL de Railway. El frontend **no** se conecta directamente a la base de datos.
+
+El workflow [`.github/workflows/deploy-develop.yml`](.github/workflows/deploy-develop.yml) corre en cada push/merge a `develop` y también se puede disparar manualmente. Hace lint, tests, build de producción, escribe `www/assets/config.json` desde un secret sin guardarlo en el repo, actualiza `CORS_ORIGIN`, redespliega el backend solo si cambió `backend/` y publica `www/` en Firebase Hosting.
+
+### Secrets de GitHub
+
+Configúralos en `Settings → Secrets and variables → Actions`:
+
+| Secret | Descripción |
+|---|---|
+| `FIREBASE_SERVICE_ACCOUNT` | JSON de una cuenta de servicio con rol `Firebase Admin` (o `Firebase Hosting Admin` + `Cloud Build Service Account` + `API Keys Admin`). |
+| `RAILWAY_API_URL` | URL pública del backend, sin `/api` (ej. `https://tu-api.up.railway.app`). Se escribe en `www/assets/config.json` durante el deploy; no se versiona. |
+| `RAILWAY_TOKEN` | Project token de Railway, del environment de producción. |
+| `RAILWAY_SERVICE_ID` | ID del servicio del backend en Railway. |
+| `FIREBASE_HOSTING_DOMAIN` | Opcional: dominio propio sin `https://`, si agregaste uno a Firebase Hosting. |
+
+> El projectId de Firebase está en [`.firebaserc`](.firebaserc) (`snacki-web`) y el site en [`firebase.json`](firebase.json) (`snacki`); ninguno es secreto. El service account y el token de Railway nunca se versionan. La URL de la API es pública en el navegador (no es un secreto), pero tampoco se guarda en el repo: `src/assets/config.json` queda con `localhost` y el workflow sobrescribe solo el archivo generado en `www/`. `CORS_ORIGIN` lo actualiza el workflow automáticamente con los dominios del site.
+
+### Variables del backend en Railway
+
+El servicio del backend debe tener configuradas `DATABASE_URL`, `JWT_SECRET`, `QR_SECRET`, `JWT_EXPIRES_IN` y `PLATFORM_TENANT_NAME` / `PLATFORM_TENANT_SLUG`. El `Dockerfile` corre `prisma migrate deploy` antes de iniciar la API.
+
+### Build de producción en local
+
+```powershell
+npm run build:prod
+$env:RAILWAY_API_URL = "https://tu-api.up.railway.app"
+npm run config:production
+```
+
+`www/` está en `.gitignore`, así que el `config.json` generado no se sube a GitHub.
 
 ## Forma de trabajo
 

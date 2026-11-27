@@ -5,6 +5,7 @@ node_modules/
 /dist
 /www
 /.angular/cache
+/.firebase
 /coverage
 
 # Capacitor

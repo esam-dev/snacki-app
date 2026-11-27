@@ -1,7 +1,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { TimeoutError, firstValueFrom, timeout } from 'rxjs';
-import { environment } from '../../environments/environment';
+import { AppConfigService } from './app-config.service';
 import { AuthService } from './auth.service';
 import { readJson, writeJson } from './demo-storage';
 
@@ -89,6 +89,7 @@ export function esQrDeCanje(valor: string): boolean {
 export class WalletService {
   private http = inject(HttpClient);
   private auth = inject(AuthService);
+  private config = inject(AppConfigService);
 
   /** Sube cada vez que llegan datos nuevos del servidor. */
   readonly version = signal(0);
@@ -129,8 +130,8 @@ export class WalletService {
     this.refrescando = (async () => {
       try {
         const [wallet, movs] = await Promise.all([
-          firstValueFrom(this.http.get<{ data: { totalPoints: number; tenants: ApiWalletTenant[]; updatedAt: string } }>(`${environment.apiBaseUrl}/api/wallet`).pipe(timeout(TIMEOUT_MS))),
-          firstValueFrom(this.http.get<{ data: { movements: ApiMovement[] } }>(`${environment.apiBaseUrl}/api/wallet/movements`).pipe(timeout(TIMEOUT_MS))),
+          firstValueFrom(this.http.get<{ data: { totalPoints: number; tenants: ApiWalletTenant[]; updatedAt: string } }>(`${this.config.apiBaseUrl}/api/wallet`).pipe(timeout(TIMEOUT_MS))),
+          firstValueFrom(this.http.get<{ data: { movements: ApiMovement[] } }>(`${this.config.apiBaseUrl}/api/wallet/movements`).pipe(timeout(TIMEOUT_MS))),
         ]);
         // Si cambió la sesión mientras se descargaba, se descarta la respuesta.
         if (this.auth.currentUser?.id !== userId) return false;
@@ -160,7 +161,7 @@ export class WalletService {
     if (!this.disponible) return { ok: false, codigo: 'NO_CLIENTE', mensaje: 'Inicia sesión con una cuenta de cliente para sumar puntos.' };
     try {
       const res = await firstValueFrom(
-        this.http.post<{ data: ApiClaim }>(`${environment.apiBaseUrl}/api/claims`, { token: valor.trim() }).pipe(timeout(TIMEOUT_MS)),
+        this.http.post<{ data: ApiClaim }>(`${this.config.apiBaseUrl}/api/claims`, { token: valor.trim() }).pipe(timeout(TIMEOUT_MS)),
       );
       await this.refrescar();
       const tenantId = res.data.tenant.id;
@@ -184,7 +185,7 @@ export class WalletService {
       const res = await firstValueFrom(
         this.http
           .post<{ data: { reward: { name: string }; tenant: { slug: string; name: string }; cost: number; balance: number; enough: boolean } }>(
-            `${environment.apiBaseUrl}/api/redemptions/preview`, { token: valor.trim() },
+            `${this.config.apiBaseUrl}/api/redemptions/preview`, { token: valor.trim() },
           )
           .pipe(timeout(TIMEOUT_MS)),
       );
@@ -202,7 +203,7 @@ export class WalletService {
       const res = await firstValueFrom(
         this.http
           .post<{ data: { code: string; cost: number; balance: number; reward: { name: string }; tenant: { name: string } } }>(
-            `${environment.apiBaseUrl}/api/redemptions`, { token: valor.trim() },
+            `${this.config.apiBaseUrl}/api/redemptions`, { token: valor.trim() },
           )
           .pipe(timeout(TIMEOUT_MS)),
       );
