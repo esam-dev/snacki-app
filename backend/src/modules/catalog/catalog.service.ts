@@ -26,6 +26,7 @@ export const catalogService = {
       select: {
         id: true, slug: true, name: true, category: true, address: true,
         latitude: true, longitude: true, logoUrl: true, pointsExpireAt: true, updatedAt: true,
+        referralEnabled: true, referrerBonusPoints: true, refereeBonusPoints: true,
         products: {
           where: { isActive: true, deletedAt: null, promoStartsAt: { lte: now }, promoEndsAt: { gte: now } },
           orderBy: { promoEndsAt: 'asc' },
@@ -52,6 +53,10 @@ export const catalogService = {
       longitude: t.longitude,
       logoUrl: publicImageUrl('tenant', t.id, t.logoUrl, t.updatedAt),
       pointsExpireAt: t.pointsExpireAt,
+      // Para mostrar "Invita y gana" en la tienda solo si el comercio tiene referidos activos.
+      referral: t.referralEnabled
+        ? { enabled: true, referrerBonusPoints: t.referrerBonusPoints, refereeBonusPoints: t.refereeBonusPoints }
+        : { enabled: false, referrerBonusPoints: 0, refereeBonusPoints: 0 },
       products: t.products.map((p) => ({
         id: p.id,
         name: p.name,
