@@ -50,6 +50,9 @@ export const updateRewardSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+export const REFERRAL_MAX_BONUS = 100_000;
+export const REFERRAL_MAX_INVITES = 1000;
+
 export const updateMerchantSettingsSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   category: z.enum(['helado', 'comida_rapida', 'pizza', 'cafe', 'otro']).optional(),
@@ -58,6 +61,11 @@ export const updateMerchantSettingsSchema = z.object({
   longitude: z.number().min(-180).max(180).optional().nullable(),
   logoUrl: imageRefSchema.optional().nullable(),
   pointsExpireAt: z.string().datetime().optional().nullable(),
+  // Reglas de referidos: bono para quien invita y para el invitado (al completar su primera compra).
+  referralEnabled: z.boolean().optional(),
+  referrerBonusPoints: z.number().int().min(0).max(REFERRAL_MAX_BONUS).optional(),
+  refereeBonusPoints: z.number().int().min(0).max(REFERRAL_MAX_BONUS).optional(),
+  referralMaxPerUser: z.number().int().min(1).max(REFERRAL_MAX_INVITES).optional(),
 });
 
 export const QR_MAX_QUANTITY = 20;
