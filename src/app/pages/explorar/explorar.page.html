@@ -31,6 +31,63 @@
       }
     </div>
 
+    <section class="near snacki-card" aria-label="Comercios cercanos">
+      <div class="near-head">
+        <div>
+          <strong>Comercios cercanos</strong>
+          <small>
+            @switch (ubicacion.estado()) {
+              @case ('activa') { Ordenados por distancia desde tu ubicación. }
+              @case ('buscando') { Buscando tu ubicación… }
+              @case ('denegada') { Permiso de ubicación denegado. Actívalo en el navegador para ver distancias. }
+              @case ('no-disponible') { No pudimos obtener tu ubicación. }
+              @default { Activa tu ubicación para ver los más cercanos. }
+            }
+          </small>
+        </div>
+        <div class="near-actions">
+          @if (ubicacion.estado() !== 'activa') {
+            <button type="button" class="near-btn primary" [disabled]="ubicacion.estado() === 'buscando'" (click)="usarUbicacion()">
+              <app-icon name="locate" /> Usar mi ubicación
+            </button>
+          }
+          <button type="button" class="near-btn" [attr.aria-expanded]="mostrarMapa" (click)="alternarMapa()">
+            <app-icon name="map" /> {{ mostrarMapa ? 'Ocultar mapa' : 'Ver mapa' }}
+          </button>
+        </div>
+      </div>
+
+      @if (mostrarMapa) {
+        @if (marcadores.length || ubicacion.posicion()) {
+          <div class="near-map">
+            <app-snacki-map
+              [marcadores]="marcadores"
+              [usuario]="ubicacion.posicion()"
+              [ajustar]="ajusteMapa"
+              (marcadorClick)="elegirMarcador($event)"
+            />
+          </div>
+        } @else {
+          <p class="near-empty">Ninguno de estos comercios tiene ubicación registrada todavía.</p>
+        }
+
+        @if (seleccionado; as sel) {
+          <div class="near-sel">
+            <img [src]="sel.logo" alt="" />
+            <div class="txt">
+              <strong>{{ sel.nombre }}</strong>
+              <small>
+                @if (distancia(sel)) { {{ distancia(sel) }} · }
+                {{ sel.direccion || nombreCategoria(sel) }}
+              </small>
+            </div>
+            <button type="button" class="near-btn primary" (click)="abrir(sel)">Ver local</button>
+            <button type="button" class="near-close" aria-label="Cerrar" (click)="cerrarSeleccion()"><app-icon name="close" /></button>
+          </div>
+        }
+      }
+    </section>
+
     <p class="count">{{ resultados.length }} {{ resultados.length === 1 ? 'comercio' : 'comercios' }}</p>
 
     <div class="merchant-grid">
@@ -49,8 +106,9 @@
               <span class="pts">{{ local.puntos | number }} <small>PTS</small></span>
             </div>
 
-            @if (nombreCategoria(local) || local.direccion) {
+            @if (distancia(local) || nombreCategoria(local) || local.direccion) {
               <div class="meta">
+                @if (distancia(local)) { <span class="dist"><app-icon name="map-pin" />{{ distancia(local) }}</span> }
                 @if (nombreCategoria(local)) { <span><ion-icon name="pricetag-outline" aria-hidden="true"></ion-icon>{{ nombreCategoria(local) }}</span> }
                 @if (local.direccion) { <span class="addr"><ion-icon name="location-outline" aria-hidden="true"></ion-icon>{{ local.direccion }}</span> }
               </div>
