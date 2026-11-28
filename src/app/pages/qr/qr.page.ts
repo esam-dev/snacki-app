@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController, IonButton, IonContent, ToastController } from '@ionic/angular';
-import { ScannerService } from '../../services/scanner.service';
+import { CameraPermissionError, ScannerService } from '../../services/scanner.service';
 import { StoreService } from '../../services/store.service';
 import { WalletService, esQrDeCanje, esQrDeCompra } from '../../services/wallet.service';
 import { SnackiHeaderComponent } from '../../shared/snacki-header/snacki-header.component';
@@ -30,6 +30,10 @@ export class QrPage {
       if (!valor) return;
       await this.procesar(valor);
     } catch (e: any) {
+      if (e instanceof CameraPermissionError) {
+        await this.pedirIrAAjustes();
+        return;
+      }
       await this.mostrar(e?.message ?? 'No se pudo escanear el código QR.');
     } finally {
       this.escaneando = false;
@@ -97,6 +101,19 @@ export class QrPage {
     } else {
       await this.mostrar(r.mensaje);
     }
+  }
+
+  /** Si el permiso fue denegado (o "no volver a preguntar"), ofrece abrir los ajustes. */
+  private async pedirIrAAjustes() {
+    const a = await this.alert.create({
+      header: 'Permiso de cámara',
+      message: 'Snacki necesita la cámara para escanear códigos QR. Actívala en Ajustes > Permisos > Cámara.',
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        { text: 'Abrir ajustes', handler: () => void this.scanner.abrirAjustes() },
+      ],
+    });
+    await a.present();
   }
 
   private async mostrar(message: string) {
