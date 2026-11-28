@@ -128,7 +128,7 @@ La carpeta `android/` ya está versionada (permisos de cámara y ubicación incl
 Desde la raíz del proyecto (PowerShell):
 
 ```powershell
-$env:RAILWAY_API_URL = "https://snacki-app-production.up.railway.app"
+$env:RAILWAY_API_URL = "https://<tu-api>.up.railway.app"
 npm run android:apk
 ```
 

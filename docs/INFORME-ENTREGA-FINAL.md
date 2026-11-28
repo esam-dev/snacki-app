@@ -4,8 +4,8 @@ Fecha: 27/11/2026 · Autores: Elías Ortiz y Bastian Herrera
 
 Snacki se entrega como APK Android conectado al backend y la base de datos en Railway.
 
-**Descargar el APK:** https://github.com/esam-dev/snacki-app/releases/download/v1.0.0/snacki-v1.0.0.apk
-(página del release: https://github.com/esam-dev/snacki-app/releases/tag/v1.0.0)
+**Descargar el APK:** https://github.com/esam-dev/snacki-app/releases/download/v1.0.1/snacki-v1.0.1.apk
+(página del release: https://github.com/esam-dev/snacki-app/releases/tag/v1.0.1)
 
 ## 1. Qué es Snacki y qué se entrega
 
@@ -19,9 +19,9 @@ Se entrega:
 
 | Entregable | Enlace / ubicación |
 |---|---|
-| APK Android (debug) | [snacki-v1.0.0.apk](https://github.com/esam-dev/snacki-app/releases/download/v1.0.0/snacki-v1.0.0.apk) (GitHub Release v1.0.0) |
+| APK Android (debug) | [snacki-v1.0.1.apk](https://github.com/esam-dev/snacki-app/releases/download/v1.0.1/snacki-v1.0.1.apk) (GitHub Release v1.0.1) |
 | Repositorio | https://github.com/esam-dev/snacki-app (rama `develop`) |
-| API (Railway) | https://snacki-app-production.up.railway.app/health |
+| API (Railway) | Desplegada en Railway; la URL no se publica (se configura con el secret `RAILWAY_API_URL`) |
 | Versión web (Firebase Hosting) | https://snacki.web.app |
 
 ## 2. Funcionalidades terminadas
@@ -71,7 +71,7 @@ Seguridad del QR: cada código es un token firmado con HMAC-SHA256, de un solo u
 
 ## 4. El APK: cómo instalarlo
 
-1. Desde el celular Android, abrir https://github.com/esam-dev/snacki-app/releases/download/v1.0.0/snacki-v1.0.0.apk y descargar el archivo.
+1. Desde el celular Android, abrir https://github.com/esam-dev/snacki-app/releases/download/v1.0.1/snacki-v1.0.1.apk y descargar el archivo.
 2. Abrirlo y permitir "Instalar apps desconocidas" para el navegador o el gestor de archivos.
 3. Abrir Snacki y aceptar los permisos de cámara (escáner QR) y ubicación (mapa).
 4. Iniciar sesión con un usuario de prueba (sección 5). Necesita internet: se conecta a la API de Railway.
@@ -79,7 +79,7 @@ Seguridad del QR: cada código es un token firmado con HMAC-SHA256, de un solo u
 Para generarlo de nuevo desde el código (PowerShell, en la raíz del proyecto; requiere JDK 21 y el SDK de Android):
 
 ```powershell
-$env:RAILWAY_API_URL = "https://snacki-app-production.up.railway.app"
+$env:RAILWAY_API_URL = "https://<tu-api>.up.railway.app"
 npm run android:sync
 cd android
 .\gradlew.bat assembleDebug
@@ -127,7 +127,7 @@ Guion (dos celulares, o uno con el APK y otro con la web):
 >
 > Snacki es una app de fidelización para comercios de comida: el comercio genera un QR al vender una promoción y el cliente lo escanea para sumar puntos en ese local y canjearlos por recompensas. Incluye referidos ("Invita y gana"), mapa de comercios cercanos, sucursales con aprobación de cambios y estadísticas para el comercio.
 >
-> - **Descargar APK:** https://github.com/esam-dev/snacki-app/releases/download/v1.0.0/snacki-v1.0.0.apk (instalar permitiendo "apps desconocidas").
+> - **Descargar APK:** https://github.com/esam-dev/snacki-app/releases/download/v1.0.1/snacki-v1.0.1.apk (instalar permitiendo "apps desconocidas").
 > - Repositorio: https://github.com/esam-dev/snacki-app (rama `develop`)
 > - Backend: Railway (Fastify + PostgreSQL) · Web: https://snacki.web.app
 > - Usuarios de prueba (contraseña `Demo1234!`): `cliente@snacki.demo` (cliente) y `comercio@snacki.demo` (comercio).
