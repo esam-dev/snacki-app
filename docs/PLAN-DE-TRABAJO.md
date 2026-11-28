@@ -30,8 +30,9 @@ Roles:
 | Auth contra backend (`/auth/*`, `/tenants`, JWT + interceptor) | Integrar `POST /api/claims` en la app del cliente |
 | Esquema Prisma + seed de comercios gastronómicos (`feat/db-schema-seed`, PR #6) | Modelo `Referral` + reglas de bono en `Tenant` (`feat/referrals-engine`) |
 | API comercio: promos, recompensas (con foto) y settings + panel comercio responsive con mapa del local (`feat/merchant-catalog`, PR #7) | Wallet, canjes, stats, referidos |
-| Catálogo del cliente desde la API: `/catalog/*` (promos vigentes, recompensas, logo e imágenes; se refresca al entrar, al volver a la app y cada 60 s) (PR #10). Mapa interactivo (OpenStreetMap) para fijar la ubicación del local, mapa en la tienda y comercios cercanos ordenados por distancia en Explorar (`feat/geolocation-map`) | SQLite offline + sincronización, push, deploy Railway, build Android, pulido UX, informe |
+| Catálogo del cliente desde la API: `/catalog/*` (promos vigentes, recompensas, logo e imágenes; se refresca al entrar, al volver a la app y cada 60 s) (PR #10). Mapa interactivo (OpenStreetMap) para fijar la ubicación del local, mapa en la tienda y comercios cercanos ordenados por distancia en Explorar (`feat/geolocation-map`) | Build Android (APK) e informe final |
 | QR firmado generado por el comercio + `POST /api/claims` atómico, una vez por QR (`feat/merchant-qr`) | |
+| Deploy: API + Postgres en Railway y web en Firebase Hosting, automático al mergear a `develop` (`chore/deploy-railway`, PR #13) | |
 | Escáner QR (`@capacitor-mlkit/barcode-scanning`); `@capacitor-community/sqlite` instalado sin usar | |
 
 ## 3. Arquitectura
@@ -40,11 +41,12 @@ App Ionic/Angular (Capacitor)
  ├─ SQLite local  ── caché de saldos/promos/recompensas/comercios + cola pending_ops
  ├─ SyncService   ── @capacitor/network: al volver la conexión envía la cola y refresca la caché
  ├─ Geolocation   ── @capacitor/geolocation → comercios cercanos en mapa (componente propio sobre teselas OpenStreetMap)
- └─ Push          ── recibe notificaciones (Firebase Cloud Messaging)
         │ HTTPS + JWT
 Backend Fastify + Prisma (Railway) ── Postgres (Railway) = fuente de verdad
-        ├─ ClaimService     ── valida QR, acredita EARN y liquida referidos en la misma transacción
-        └─ firebase-admin   ── envía push
+        └─ ClaimService     ── valida QR, acredita EARN y liquida referidos en la misma transacción
+
+Web (build de Ionic en `www/`) ── Firebase Hosting; llama a la API de Railway (`assets/config.json`)
+GitHub Actions (`deploy-develop.yml`) ── en cada merge a `develop`: lint + tests → Railway + Firebase Hosting
 ```
 
 **Regla clave offline:** el celular **nunca decide saldos**. Sin conexión, el escaneo se guarda en SQLite como `PENDING` y se muestra **"puntos por confirmar"**. Al sincronizar, el servidor valida el QR (firma, un solo uso, vencimiento) y recién ahí acredita (y, si corresponde, liquida el bono de referido). Si el servidor lo rechaza, se marca `REJECTED` con el motivo. **Los canjes requieren conexión** (evita gastar puntos dos veces). Aplicar un código de referido también requiere conexión.
@@ -122,7 +124,7 @@ Sincronización (`SyncService`):
 | Conexión | `@capacitor/network` |
 | Ubicación | `@capacitor/geolocation` |
 | Mapa | Componente propio `app-snacki-map` + teselas OpenStreetMap (gratis, sin API key ni dependencias) |
-| Push | `@capacitor/push-notifications` + Firebase Cloud Messaging; backend `firebase-admin` |
+| Deploy | Railway (API + Postgres) · Firebase Hosting (web) · GitHub Actions |
 | Generar QR | `qrcode` |
 | Escanear QR | `@capacitor-mlkit/barcode-scanning` (ya instalado) |
 | Compartir código de referido | `@capacitor/share` (opcional; fallback copiar al portapapeles) |
@@ -134,24 +136,26 @@ Todas salen de `develop` y vuelven por PR a `develop` (revisa la otra persona). 
 
 | Rama | Responsable | Objetivo / terminado cuando… | Estado |
 |---|---|---|---|
+| `feature/base-architecture` | A | Estructura base Ionic/Angular, rutas y servicios | Hecho (PR #1, #9) |
+| `feature/figma-ui-screens-bastian` | B | Pantallas del cliente según el diseño de Figma | Hecho (PR #2) |
+| `feature/branding-login-ui` | A | Branding Snacki y UI de login/registro | Hecho (PR #3) |
+| `codex/qr-scanner-loyalty-flow` | A | Escáner QR (`@capacitor-mlkit/barcode-scanning`) y flujo de fidelización | Hecho (PR #4) |
+| `feat/backend-auth-base` | A | Backend base: `/auth/*`, `/tenants`, JWT + interceptor | Hecho (PR #5) |
 | `feat/db-schema-seed` | A + B | Migración Prisma con los modelos de §4 + seed (4 comercios con coordenadas, promos, recompensas; usuarios demo) | Hecho (PR #6) |
 | `feat/merchant-catalog` | A | CRUD promos y recompensas + settings (back + panel comercio) | Hecho (PR #7) |
-| `feat/branch-approvals` | A | Registro con pestañas (local nuevo / sucursal), rol titular-asistente y aprobación de cambios de promos y recompensas | Hecho (pendiente de probar) |
-| `chore/deploy-railway` | B | API + Postgres en Railway, `/health` responde, variables `JWT_SECRET`, `QR_SECRET`, `DATABASE_URL`, `CORS_ORIGINS`, Firebase | En curso |
-| `feat/merchant-qr` | A | Comercio genera QR de una promo vigente y lo muestra en pantalla | Hecho (falta PR) |
-| `feat/client-claims-wallet` | B | Escanear → `POST /claims` → saldo; wallet por comercio con progreso a recompensa y vencimientos; movimientos; canje de recompensas solo con QR del comercio | Hecho (PR) |
-| `feat/referrals-engine` | A | Migración `ReferralCode` + `Referral` + reglas en `Tenant`; `POST /referrals/apply`, `GET /referrals/me`; liquidación `REFERRAL_BONUS` dentro de `ClaimService`; settings de referidos en panel; pantalla "Invita y gana" en cliente; tests (auto-referido, doble referido, cliente existente, bono una sola vez, claim offline sincronizado) | Hecho: backend, ajustes en el panel (Configuración → Invita y gana) y pantalla "Invita y gana" (`/tabs/referidos`, accesos en home, perfil y tienda) |
-| `feat/merchant-redemptions-stats` | A | Lista de canjes y estadísticas por período con métricas de recompra y referidos (entrega inmediata vía QR de canje) | Hecho (PR) |
-| `feat/client-redemptions` | B | Canjear recompensa con código; errores de saldo insuficiente y sin red | Cubierto por `feat/client-claims-wallet` (canje con QR) |
-| `feat/offline-sqlite-sync` | B | SQLite local, cola `pending_ops`, `SyncService`, indicador "sin conexión / por confirmar" | Pendiente |
-| `feat/geolocation-map` | A | Mapa de comercios cercanos en Explorar, ubicación del local elegible en el mapa y mapa en la tienda | Hecho (pendiente de probar) |
-| `feat/push-notifications` | A | Registro de token, panel para enviar notificación, cliente la recibe en Android; aviso de vencimiento de puntos (opcional) | Pendiente |
-| `chore/android-build` | B | `npx cap add android`, permisos, APK apuntando a Railway | Pendiente |
-| `fix/polish-ux-details` | A + B | Ver §9 | Pendiente |
-| `docs/informe-final` | A + B | Informe, diagramas, README actualizado, guion de demo | Pendiente |
+| `fix/login-logout-fotos-catalogo` | B | Arreglos de login/logout, fotos y catálogo del cliente desde `/catalog/*` | Hecho (PR #10) |
+| `feat/merchant-qr` | A | Comercio genera QR de una promo vigente y lo muestra en pantalla | Hecho (PR #12) |
+| `chore/deploy-railway` | B | API + Postgres en **Railway** (`/health` responde; variables `JWT_SECRET`, `QR_SECRET`, `DATABASE_URL`, `CORS_ORIGIN`) y web en **Firebase Hosting** (`firebase.json`, `.firebaserc`); workflow `deploy-develop.yml` que en cada merge a `develop` corre lint + tests, redespliega el backend en Railway y publica `www/` en Firebase | Hecho (PR #13) |
+| `feat/client-claims-wallet` | B | Escanear → `POST /claims` → saldo; wallet por comercio con progreso a recompensa y vencimientos; movimientos; canje de recompensas solo con QR del comercio | Hecho (PR #14) |
+| `feat/branch-approvals` | A | Registro con pestañas (local nuevo / sucursal), rol titular-asistente y aprobación de cambios de promos y recompensas | Hecho (PR #16) |
+| `feat/referrals-engine` | A | `ReferralCode` + `Referral` + reglas en `Tenant`; `POST /referrals/apply`, `GET /referrals/me`; liquidación `REFERRAL_BONUS` en `ClaimService`; ajustes en el panel y pantalla "Invita y gana" en el cliente | Hecho (PR #17) |
+| `feat/merchant-redemptions-stats` | A | Lista de canjes y estadísticas por período con métricas de recompra y referidos (entrega inmediata vía QR de canje) | Hecho (PR #18) |
+| `feat/geolocation-map` + `fix/geolocation-map` | A | Mapa de comercios cercanos en Explorar (orden por distancia), ubicación del local elegible en el mapa y mapa en la tienda con "Cómo llegar" | Hecho (PR #15; fix en PR #19) |
+| `chore/android-build` | B | `npx cap add android`, permisos, APK apuntando a Railway | Pendiente (penúltima) |
+| `docs/informe-final` | A + B | Informe, diagramas, README actualizado (deploy en Railway + Firebase Hosting, secrets de GitHub Actions), guion de demo | Pendiente (última) |
 
-## 9. Arreglos y pulido (`fix/polish-ux-details`)
-Rama corta al final, después de integrar; cada punto es un commit pequeño.
+## 9. Arreglos y pulido
+Sin rama propia: lo que quede pendiente se resuelve dentro de `chore/android-build` al probar el APK.
 
 **Limpieza de datos simulados**
 - Retirar datos simulados/residuales de `localStorage` y de `store.service.ts` (saldos, catálogo, canjes de demo); todo sale de la API o de la caché SQLite.
@@ -192,10 +196,10 @@ Rama corta al final, después de integrar; cada punto es un commit pequeño.
 |---|---|---|
 | 1 | Hecho. Juntos: `feat/db-schema-seed`, contrato API (§6) | Hecho. Juntos + inicio `chore/deploy-railway` |
 | 2 | Hecho: `feat/merchant-catalog`. Siguiente: `feat/merchant-qr` | `chore/deploy-railway` + `feat/client-claims-wallet` backend + tests (doble escaneo, vencido) |
-| 3 | `feat/referrals-engine` backend (migración, apply/me, liquidación en `ClaimService`, tests) | `feat/client-claims-wallet` front (progreso, vencimientos) + `feat/client-redemptions` |
-| 4 | `feat/referrals-engine` front + `feat/merchant-redemptions-stats` | `feat/offline-sqlite-sync` |
-| 5 | `feat/geolocation-map` + `feat/push-notifications` | `feat/offline-sqlite-sync` (pruebas modo avión, claim offline que completa referido) + `chore/android-build` |
-| 6 | Integración E2E en celular contra Railway + `fix/polish-ux-details` | Integración E2E + `fix/polish-ux-details` |
+| 3 | Hecho: `feat/merchant-qr` + `feat/referrals-engine` backend | Hecho: `chore/deploy-railway` + `feat/client-claims-wallet` |
+| 4 | Hecho: `feat/referrals-engine` front + `feat/branch-approvals` + `feat/merchant-redemptions-stats` | Hecho: `feat/client-claims-wallet` front (progreso, vencimientos, canje con QR) |
+| 5 | Hecho: `feat/geolocation-map` + `fix/geolocation-map` | Integración E2E en celular contra Railway |
+| 6 | Integración E2E en celular contra Railway | `chore/android-build` (APK apuntando a Railway) |
 | 7 | `docs/informe-final` | `docs/informe-final` + guion de demo |
 
 **Si el tiempo no alcanza**, recortar en este orden: aviso automático de vencimiento → historial de notificaciones → stats detalladas (dejar solo totales y referidos completados) → filtro por categoría → radio configurable del mapa → compartir con `@capacitor/share` (dejar copiar código).
