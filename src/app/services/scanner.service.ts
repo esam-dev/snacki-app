@@ -25,9 +25,12 @@ export class ScannerService {
       }
     }
 
-    const { camera } = await BarcodeScanner.requestPermissions();
+    let { camera } = await BarcodeScanner.checkPermissions();
     if (camera !== 'granted' && camera !== 'limited') {
-      throw new Error('Se necesita permiso de cámara para escanear el código QR.');
+      ({ camera } = await BarcodeScanner.requestPermissions());
+    }
+    if (camera !== 'granted' && camera !== 'limited') {
+      throw new Error('Se necesita permiso de cámara para escanear el código QR. Actívalo en Ajustes > Aplicaciones > Snacki > Permisos.');
     }
 
     const { barcodes } = await BarcodeScanner.scan({ formats: [BarcodeFormat.QrCode] });
