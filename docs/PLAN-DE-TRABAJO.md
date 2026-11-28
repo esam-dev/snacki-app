@@ -151,7 +151,7 @@ Todas salen de `develop` y vuelven por PR a `develop` (revisa la otra persona). 
 | `feat/referrals-engine` | A | `ReferralCode` + `Referral` + reglas en `Tenant`; `POST /referrals/apply`, `GET /referrals/me`; liquidación `REFERRAL_BONUS` en `ClaimService`; ajustes en el panel y pantalla "Invita y gana" en el cliente | Hecho (PR #17) |
 | `feat/merchant-redemptions-stats` | A | Lista de canjes y estadísticas por período con métricas de recompra y referidos (entrega inmediata vía QR de canje) | Hecho (PR #18) |
 | `feat/geolocation-map` + `fix/geolocation-map` | A | Mapa de comercios cercanos en Explorar (orden por distancia), ubicación del local elegible en el mapa y mapa en la tienda con "Cómo llegar" | Hecho (PR #15 + PR #19) |
-| `chore/android-build` | B | `npx cap add android`, permisos, APK apuntando a Railway | Pendiente (penúltima) |
+| `chore/android-build` | B | `android/` versionado, permisos de cámara y ubicación, CORS para `https://localhost`, scripts `android:sync` / `android:apk` y APK de debug apuntando a Railway | Hecho |
 | `docs/informe-final` | A + B | Informe, diagramas, README actualizado (deploy en Railway + Firebase Hosting, secrets de GitHub Actions), guion de demo | Pendiente (última) |
 
 ## 9. Arreglos y pulido
@@ -188,7 +188,7 @@ Sin rama propia: lo que quede pendiente se resuelve dentro de `chore/android-bui
 
 **Higiene del repositorio**
 - `.env`, `google-services.json`, `node_modules/` y carpetas de build (`dist/`, `www/`, `.angular/`, `android/app/build/`) fuera de Git; agregar `google-services.json` al `.gitignore` y verificar con `git ls-files`.
-- Hoy `/android` está ignorado completo: decidir en `chore/android-build` si se versiona `android/` (sin `build/` ni `google-services.json`) para conservar permisos y configuración.
+- `android/` se versiona (sin `build/`, `local.properties`, assets generados ni `google-services.json`) para conservar permisos y configuración.
 - `.env.example` actualizado en front y backend.
 
 ## 10. Cronograma

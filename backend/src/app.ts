@@ -15,9 +15,10 @@ export async function buildApp() {
   // 2 MB: deja margen para logos enviados como data URL (ver imageRefSchema).
   const app = Fastify({ logger: env.NODE_ENV !== 'test', bodyLimit: 2 * 1024 * 1024 });
 
+  // El APK de Capacitor (Android) carga la app desde https://localhost.
   await app.register(cors, {
     origin: (origin, cb) => {
-      if (!origin || env.corsOrigins.includes(origin) || /^(capacitor|ionic):\/\//.test(origin) || /^http:\/\/localhost(:\d+)?$/.test(origin)) return cb(null, true);
+      if (!origin || env.corsOrigins.includes(origin) || /^(capacitor|ionic):\/\//.test(origin) || /^https?:\/\/localhost(:\d+)?$/.test(origin)) return cb(null, true);
       return cb(null, false);
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
