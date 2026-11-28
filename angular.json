@@ -25,6 +25,7 @@
             "index": "src/index.html",
             "polyfills": [],
             "tsConfig": "tsconfig.app.json",
+            "allowedCommonJsDependencies": ["qrcode"],
             "inlineStyleLanguage": "scss",
             "assets": [
               {
@@ -47,8 +48,8 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "6kb",
-                  "maximumError": "8kb"
+                  "maximumWarning": "8kb",
+                  "maximumError": "16kb"
                 }
               ],
               "fileReplacements": [

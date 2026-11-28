@@ -20,3 +20,72 @@
 
 .empty { text-align: center; color: #666; margin-top: 32px; }
 .redeem-btn { margin: 8px 0 0; font-size: 11px; }
+.section-title { margin: 20px 4px 0; font-size: 16px; font-weight: 700; }
+
+.invite-banner {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 12px 12px 0;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: #eef4ff;
+  color: #1b3a8a;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+
+  strong { display: block; font-size: 14px; margin-bottom: 2px; }
+}
+
+.store-map {
+  margin: 12px 12px 0;
+  padding: 0;
+  overflow: hidden;
+
+  .map-box { height: 200px; @media (min-width: 768px) { height: 280px; } }
+
+  .map-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+
+    > app-icon { font-size: 18px; flex: 0 0 auto; }
+    .txt { flex: 1; min-width: 0; }
+    strong { display: block; font-size: 13.5px; overflow-wrap: anywhere; }
+    small { display: block; margin-top: 2px; font-size: 11.5px; color: #5f6470; }
+  }
+
+  .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #1b3a8a;
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .go {
+    flex: 0 0 auto;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: #111;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+}
+
+.store-addr {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 14px 0;
+  font-size: 12.5px;
+  color: #5f6470;
+}

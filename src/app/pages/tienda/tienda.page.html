@@ -1,6 +1,5 @@
 <ion-content class="snacki-page" [fullscreen]="true">
   <app-snacki-header></app-snacki-header>
-  <app-inicio-bar></app-inicio-bar>
 
   @if (local) {
     <section class="store-banner snacki-card">
@@ -12,21 +11,72 @@
       <ion-button class="snacki-btn small" (click)="mostrarQr()">Escanear compra</ion-button>
     </section>
 
-    @if (local.productos.length) {
+    @if (punto) {
+      <section class="store-map snacki-card" aria-label="Ubicación del local">
+        <div class="map-box">
+          <app-snacki-map [centro]="punto" [zoom]="16" [marcadores]="marcadores" [usuario]="ubicacion.posicion()" />
+        </div>
+        <div class="map-info">
+          <app-icon name="map-pin" />
+          <div class="txt">
+            <strong>{{ local.direccion || 'Ubicación del local' }}</strong>
+            <small>
+              @if (distancia) { A {{ distancia }} de ti }
+              @else if (ubicacion.estado() === 'buscando') { Calculando distancia… }
+              @else if (ubicacion.estado() === 'denegada') { Activa la ubicación para ver la distancia }
+              @else { <button type="button" class="link" (click)="usarUbicacion()">Ver a qué distancia estoy</button> }
+            </small>
+          </div>
+          <a class="go" [href]="urlComoLlegar" target="_blank" rel="noopener">Cómo llegar</a>
+        </div>
+      </section>
+    } @else if (local.direccion) {
+      <p class="store-addr"><app-icon name="map-pin" /> {{ local.direccion }}</p>
+    }
+
+    @if (local.referidos?.activo) {
+      <button type="button" class="invite-banner" (click)="invitar()">
+        <strong>Invita y gana</strong>
+        <span>
+          @if (local.referidos!.bonoInvita > 0) { Tú ganas {{ local.referidos!.bonoInvita | number }} pts }
+          @if (local.referidos!.bonoInvita > 0 && local.referidos!.bonoInvitado > 0) { y }
+          @if (local.referidos!.bonoInvitado > 0) { tu amigo {{ local.referidos!.bonoInvitado | number }} pts }
+          cuando haga su primera compra con promo aquí.
+        </span>
+      </button>
+    }
+
+    @if (local.promos.length) {
+      <h2 class="section-title">Promos vigentes</h2>
       <div class="item-grid">
-        @for (p of local.productos; track p.nombre) {
+        @for (promo of local.promos; track promo.id) {
+          <article class="item-card">
+            <div class="media"><img [src]="promo.imagen" [alt]="promo.nombre" /></div>
+            <div class="info">
+              <div class="name">{{ promo.nombre }}</div>
+              <div class="pts">+{{ promo.puntos | number }} PTS</div>
+            </div>
+          </article>
+        }
+      </div>
+    }
+
+    @if (local.productos.length) {
+      <h2 class="section-title">Recompensas</h2>
+      <div class="item-grid">
+        @for (p of local.productos; track p.id ?? p.nombre) {
           <article class="item-card">
             <div class="media"><img [src]="p.imagen" [alt]="p.nombre" /></div>
             <div class="info">
               <div class="name">{{ p.nombre }}</div>
               <div class="pts">{{ p.puntos | number }} PTS</div>
-              <ion-button class="snacki-btn redeem-btn" size="small" (click)="canjear(p)">Canjear</ion-button>
+              <ion-button class="snacki-btn redeem-btn" size="small" (click)="canjear(p)">Canjear en el local</ion-button>
             </div>
           </article>
         }
       </div>
     } @else {
-      <p class="empty">Este local aún no tiene ofertas disponibles.</p>
+      <p class="empty">Este local aún no tiene recompensas disponibles.</p>
     }
   }
 </ion-content>

@@ -1,0 +1,91 @@
+<ion-content class="snacki-page" [fullscreen]="true">
+  <app-snacki-header [back]="true"></app-snacki-header>
+
+  <section class="intro">
+    <h1><ion-icon name="gift-outline" aria-hidden="true"></ion-icon> Invita y gana</h1>
+    <p>
+      Comparte tu código de cada comercio. Cuando tu amigo haga su <strong>primera compra con promo</strong> ahí,
+      los dos reciben puntos de bono en ese comercio. Los bonos vencen igual que los demás puntos.
+    </p>
+  </section>
+
+  @if (invitacionesPendientes.length) {
+    @for (c of invitacionesPendientes; track c.tenantId) {
+      <p class="reminder">
+        {{ c.invitadoPor!.nombre }} te invitó a {{ c.nombre }}.
+        @if (c.bonoInvitado > 0) { Haz tu primera compra con promo ahí y ganas {{ c.bonoInvitado | number }} pts. }
+        @else { Haz tu primera compra con promo ahí para completar la invitación. }
+      </p>
+    }
+  }
+
+  @if (cargando) {
+    <div class="loading"><ion-spinner name="crescent"></ion-spinner></div>
+  } @else {
+    @if (sinConexion && comercios.length) {
+      <p class="offline">Sin conexión: mostrando tus datos del {{ actualizado | date: 'dd/MM HH:mm' }}.</p>
+    }
+
+    <div class="cards">
+      @for (c of comercios; track c.tenantId) {
+        <article class="ref-card snacki-card" [class.highlight]="c.slug === destacado">
+          <header class="ref-head">
+            <img [src]="c.logo || logoPorDefecto" [alt]="c.nombre" />
+            <div>
+              <div class="ref-name">{{ c.nombre }}</div>
+              <div class="ref-bonus">
+                @if (c.bonoInvita > 0) { Tú ganas {{ c.bonoInvita | number }} pts }
+                @if (c.bonoInvita > 0 && c.bonoInvitado > 0) { · }
+                @if (c.bonoInvitado > 0) { Tu amigo gana {{ c.bonoInvitado | number }} pts }
+              </div>
+            </div>
+          </header>
+
+          <div class="code-row">
+            <span class="code" [attr.aria-label]="'Tu código en ' + c.nombre">{{ c.codigo }}</span>
+            <button type="button" class="code-btn" (click)="copiar(c)" aria-label="Copiar código"><ion-icon name="copy-outline"></ion-icon></button>
+            <button type="button" class="code-btn" (click)="compartir(c)" aria-label="Compartir invitación"><ion-icon name="share-social-outline"></ion-icon></button>
+          </div>
+
+          <dl class="stats">
+            <div><dt>Pendientes</dt><dd>{{ c.pendientes }}</dd></div>
+            <div><dt>Completados</dt><dd>{{ c.completados }}</dd></div>
+            <div><dt>Bono ganado</dt><dd>{{ c.bonoGanado | number }} pts</dd></div>
+          </dl>
+          <p class="hint">
+            @if (c.restantes > 0) {
+              Te quedan {{ c.restantes }} invitacion{{ c.restantes === 1 ? '' : 'es' }} en este comercio.
+            } @else {
+              Ya usaste tus {{ c.maximo }} invitaciones en este comercio.
+            }
+            @if (c.pendientes > 0) { Las pendientes se completan cuando tu amigo hace su primera compra con promo. }
+          </p>
+          @if (c.invitadoPor?.estado === 'COMPLETED') {
+            <p class="hint ok">Llegaste invitado por {{ c.invitadoPor!.nombre }}: bono recibido.</p>
+          }
+        </article>
+      } @empty {
+        <p class="empty">
+          @if (sinConexion) { No pudimos cargar tus códigos. Revisa tu conexión e inténtalo de nuevo. }
+          @else { Por ahora ningún comercio tiene referidos activos. Vuelve pronto. }
+        </p>
+      }
+    </div>
+  }
+
+  <section class="apply snacki-card">
+    <h2>¿Te invitaron?</h2>
+    <p>Escribe el código de tu amigo antes de tu primera compra en ese comercio.</p>
+    <ion-input
+      class="snacki-input code-input"
+      [(ngModel)]="codigoAmigo"
+      placeholder="Ej: K7M2QXA"
+      maxlength="20"
+      autocapitalize="characters"
+      (keyup.enter)="aplicar()"
+    ></ion-input>
+    <ion-button class="snacki-btn" [disabled]="aplicando || !codigoAmigo.trim()" (click)="aplicar()">
+      @if (aplicando) { <ion-spinner name="dots"></ion-spinner> } @else { Usar código }
+    </ion-button>
+  </section>
+</ion-content>

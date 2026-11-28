@@ -1,0 +1,194 @@
+name: Deploy develop
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-develop
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Validar, desplegar backend y web
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+
+      - name: Validar secrets
+        id: secrets
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          RAILWAY_API_URL: ${{ secrets.RAILWAY_API_URL }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+        run: |
+          # Backend (Railway) necesita token + service id.
+          missing_backend=()
+          [[ -n "$RAILWAY_TOKEN" ]] || missing_backend+=("RAILWAY_TOKEN")
+          [[ -n "$RAILWAY_SERVICE_ID" ]] || missing_backend+=("RAILWAY_SERVICE_ID")
+          # Web (Firebase) necesita la cuenta de servicio + la URL de la API para config.json.
+          missing_web=()
+          [[ -n "$FIREBASE_SERVICE_ACCOUNT" ]] || missing_web+=("FIREBASE_SERVICE_ACCOUNT")
+          [[ -n "$RAILWAY_API_URL" ]] || missing_web+=("RAILWAY_API_URL")
+
+          if [ ${#missing_backend[@]} -eq 0 ]; then
+            echo "deploy_backend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy_backend=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Deploy backend omitido::Faltan secrets: ${missing_backend[*]}"
+          fi
+          if [ ${#missing_web[@]} -eq 0 ]; then
+            echo "deploy_web=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy_web=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Deploy web omitido::Faltan secrets: ${missing_web[*]}"
+          fi
+
+      - name: Leer configuración de Firebase
+        id: firebase
+        run: |
+          project_id="$(node -e "console.log(JSON.parse(require('fs').readFileSync('.firebaserc','utf8')).projects.default)")"
+          site_id="$(node -e "console.log(JSON.parse(require('fs').readFileSync('firebase.json','utf8')).hosting.site || '')")"
+          if [ -z "$site_id" ]; then site_id="$project_id"; fi
+          echo "project_id=$project_id" >> "$GITHUB_OUTPUT"
+          echo "site_id=$site_id" >> "$GITHUB_OUTPUT"
+
+      - name: Instalar dependencias del frontend
+        run: npm ci
+
+      - name: Lint del frontend
+        run: npm run lint
+
+      - name: Tests del frontend
+        run: npm test -- --configuration ci
+
+      - name: Build de producción del frontend
+        run: npm run build:prod
+
+      - name: Inyectar configuración de producción en www/assets/config.json
+        if: steps.secrets.outputs.deploy_web == 'true'
+        env:
+          RAILWAY_API_URL: ${{ secrets.RAILWAY_API_URL }}
+        run: npm run config:production
+
+      - name: Instalar dependencias del backend
+        working-directory: backend
+        run: npm ci
+
+      - name: Generar Prisma Client
+        working-directory: backend
+        run: npm run prisma:generate
+
+      - name: Tests del backend
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://test:test@localhost:5432/test?schema=public
+          JWT_SECRET: github-actions-test-secret-123456
+        run: npm test
+
+      - name: Detectar cambios del backend
+        id: backend_changes
+        run: |
+          before="${{ github.event.before }}"
+          if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet "$before" "${{ github.sha }}" -- backend .github/workflows/deploy-develop.yml; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Instalar Railway CLI
+        if: steps.secrets.outputs.deploy_backend == 'true'
+        run: npm install -g @railway/cli@latest
+
+      - name: Configurar CORS en Railway
+        if: steps.secrets.outputs.deploy_backend == 'true'
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+          FIREBASE_SITE_ID: ${{ steps.firebase.outputs.site_id }}
+          FIREBASE_HOSTING_DOMAIN: ${{ secrets.FIREBASE_HOSTING_DOMAIN }}
+        run: |
+          origins="https://${FIREBASE_SITE_ID}.web.app,https://${FIREBASE_SITE_ID}.firebaseapp.com,http://localhost:8100,http://localhost:4200"
+          if [ -n "$FIREBASE_HOSTING_DOMAIN" ]; then
+            origins="${origins},https://${FIREBASE_HOSTING_DOMAIN}"
+          fi
+          railway variable set "CORS_ORIGIN=$origins" --service "$RAILWAY_SERVICE_ID" --skip-deploys -y
+
+      - name: Desplegar backend en Railway
+        if: steps.secrets.outputs.deploy_backend == 'true' && steps.backend_changes.outputs.changed == 'true'
+        working-directory: backend
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+        run: railway up --service "$RAILWAY_SERVICE_ID" --ci -y -m "develop ${{ github.sha }}"
+
+      - name: Escribir credenciales de Firebase
+        if: steps.secrets.outputs.deploy_web == 'true'
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/firebase"
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase/service-account.json"
+          chmod 600 "$RUNNER_TEMP/firebase/service-account.json"
+
+      - name: Instalar Firebase CLI
+        if: steps.secrets.outputs.deploy_web == 'true'
+        run: npm install -g firebase-tools@latest
+
+      - name: Desplegar web en Firebase Hosting
+        if: steps.secrets.outputs.deploy_web == 'true'
+        env:
+          FIREBASE_PROJECT_ID: ${{ steps.firebase.outputs.project_id }}
+          FIREBASE_HOSTING_DOMAIN: ${{ secrets.FIREBASE_HOSTING_DOMAIN }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase/service-account.json
+        run: firebase deploy --only hosting --project "$FIREBASE_PROJECT_ID" -m "develop ${{ github.sha }}"
+
+      - name: Resumen del despliegue
+        env:
+          FIREBASE_SITE_ID: ${{ steps.firebase.outputs.site_id }}
+          FIREBASE_HOSTING_DOMAIN: ${{ secrets.FIREBASE_HOSTING_DOMAIN }}
+          RAILWAY_API_URL: ${{ secrets.RAILWAY_API_URL }}
+          BACKEND_CHANGED: ${{ steps.backend_changes.outputs.changed }}
+          DEPLOY_BACKEND: ${{ steps.secrets.outputs.deploy_backend }}
+          DEPLOY_WEB: ${{ steps.secrets.outputs.deploy_web }}
+        run: |
+          {
+            echo "### Deploy develop"
+            if [ "$DEPLOY_WEB" = "true" ]; then
+              echo "- Web: https://${FIREBASE_SITE_ID}.web.app"
+              if [ -n "$FIREBASE_HOSTING_DOMAIN" ]; then
+                echo "- Dominio propio: https://${FIREBASE_HOSTING_DOMAIN}"
+              fi
+              echo "- API: ${RAILWAY_API_URL}"
+            else
+              echo "- Web: **omitido** (faltan FIREBASE_SERVICE_ACCOUNT y/o RAILWAY_API_URL)"
+            fi
+            if [ "$DEPLOY_BACKEND" = "true" ]; then
+              echo "- Backend redesplegado: ${BACKEND_CHANGED}"
+            else
+              echo "- Backend: **omitido** (faltan RAILWAY_TOKEN y/o RAILWAY_SERVICE_ID)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

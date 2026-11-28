@@ -2,6 +2,9 @@
   <div class="home-top">
     <app-snacki-header></app-snacki-header>
     <div class="home-shortcuts" aria-label="Accesos próximos">
+      <a class="home-shortcut" routerLink="/tabs/referidos" aria-label="Invita y gana" title="Invita y gana">
+        <ion-icon name="gift-outline" aria-hidden="true"></ion-icon>
+      </a>
       <span class="home-shortcut" role="img" aria-label="Notificaciones" title="Notificaciones">
         <ion-icon name="notifications-outline" aria-hidden="true"></ion-icon>
       </span>
@@ -62,6 +65,28 @@
     </div>
   </section>
 
+  @if (promos.length) {
+    <section class="home-section rewards-section">
+      <div class="section-heading">
+        <div><p class="eyebrow">PROMOS VIGENTES</p><h2>Gana puntos con lo nuevo</h2></div>
+        <button type="button" (click)="irA('/tabs/explorar')">Explorar</button>
+      </div>
+
+      <div class="reward-list">
+        @for (promo of promos; track promo.id) {
+          <button class="reward-card" type="button" (click)="abrirPromo(promo)">
+            <span class="reward-image"><img [src]="promo.imagen" [alt]="promo.nombre" /></span>
+            <span class="reward-details">
+              <small>{{ promo.comercio }}</small>
+              <strong>{{ promo.nombre }}</strong>
+              <span>+{{ promo.puntos | number }} PTS</span>
+            </span>
+          </button>
+        }
+      </div>
+    </section>
+  }
+
   @if (ofertas.length) {
     <section class="home-section rewards-section">
       <div class="section-heading">
@@ -70,7 +95,7 @@
       </div>
 
       <div class="reward-list">
-        @for (oferta of ofertas; track oferta.nombre) {
+        @for (oferta of ofertas; track oferta.comercioId + ':' + (oferta.id ?? oferta.nombre)) {
           <button class="reward-card" type="button" (click)="abrirOferta(oferta)">
             <span class="reward-image"><img [src]="oferta.imagen" [alt]="oferta.nombre" /></span>
             <span class="reward-details">

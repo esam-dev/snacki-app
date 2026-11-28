@@ -1,101 +1,133 @@
-import { Injectable } from '@angular/core';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Injectable, computed, inject, signal } from '@angular/core';
+import { TimeoutError, firstValueFrom, timeout } from 'rxjs';
+import { ApiResponse, AuthSessionData, LoginPayload, MeSessionData, RegisterPayload, SessionUser, UserRole } from '../models/auth.models';
+import { AppConfigService } from './app-config.service';
+import { TokenStorageService } from './token-storage.service';
 
-export interface SnackiUser {
-  nombre: string;
-  correo: string;
-  tipo: 'cliente' | 'comercio';
-  comercioId?: string;
-}
+export type TipoCuenta = UserRole;
+export type SnackiUser = SessionUser;
+export interface AuthActionResult { success: boolean; message?: string; code?: string; }
 
-export type TipoCuenta = SnackiUser['tipo'];
+/** Si el servidor no responde, el intento se da por fallido y la pantalla vuelve al formulario. */
+const AUTH_REQUEST_TIMEOUT_MS = 15_000;
 
-const SESSION_KEY = 'snacki.current-user';
-const PROFILES_KEY = 'snacki.profiles';
-
-/** Sesión local de demostración. La autenticación real requiere un backend. */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private usuarioActual: SnackiUser | null = this.leerSesion();
+  private readonly http = inject(HttpClient);
+  private readonly tokenStorage = inject(TokenStorageService);
+  private readonly config = inject(AppConfigService);
+  private readonly _currentUser = signal<SessionUser | null>(null);
+  readonly authStatus = signal<'unknown' | 'authenticated' | 'anonymous'>('unknown');
+  readonly currentUserSignal = this._currentUser.asReadonly();
+  readonly isAuthenticated = computed(() => this.authStatus() === 'authenticated' && !!this._currentUser());
+  readonly role = computed(() => this._currentUser()?.role ?? null);
+  private restorePromise: Promise<void> | null = null;
 
-  get currentUser(): SnackiUser | null {
-    return this.usuarioActual;
+  get currentUser() { return this._currentUser(); }
+
+  async restoreSession(): Promise<void> {
+    if (this.authStatus() !== 'unknown') return;
+    if (this.restorePromise) return this.restorePromise;
+    this.restorePromise = (async () => {
+      try {
+        this.clearLegacy();
+        const token = await this.tokenStorage.getToken();
+        if (!token) return this.clearSession();
+        const res = await firstValueFrom(this.http.get<ApiResponse<MeSessionData>>(`${this.config.apiBaseUrl}/api/auth/me`));
+        this._currentUser.set(this.toSession(res.data.user, res.data.membership));
+        this.authStatus.set('authenticated');
+      } catch {
+        await this.tokenStorage.clear();
+        this.clearSession();
+      } finally {
+        this.restorePromise = null;
+      }
+    })();
+    return this.restorePromise;
   }
 
-  iniciarSesion(identificador: string, password: string, tipo: TipoCuenta = 'cliente'): boolean {
-    const valor = identificador.trim();
-    if (!valor || !password.trim()) return false;
-
-    const perfiles = this.leerPerfiles();
-    const perfilGuardado = perfiles.find((perfil) =>
-      perfil.correo.toLowerCase() === valor.toLowerCase() || perfil.nombre.toLowerCase() === valor.toLowerCase(),
-    );
-    if (perfilGuardado && perfilGuardado.tipo !== tipo) return false;
-    if (tipo === 'comercio' && (!perfilGuardado?.comercioId)) return false;
-    const nombre = perfilGuardado?.nombre ?? this.nombreDesdeIdentificador(valor);
-    const correo = perfilGuardado?.correo ?? (valor.includes('@') ? valor : '');
-
-    this.guardarSesion({ nombre, correo, tipo, ...(tipo === 'comercio' && perfilGuardado?.comercioId ? { comercioId: perfilGuardado.comercioId } : {}) });
-    return true;
+  async ensureSessionResolved() {
+    if (this.authStatus() === 'unknown') await this.restoreSession();
   }
 
-  registrar(nombre: string, correo: string, tipo: TipoCuenta = 'cliente', comercioId?: string) {
-    const perfil: SnackiUser = {
-      nombre: this.formatearNombre(nombre),
-      correo: correo.trim(),
-      tipo,
-      ...(tipo === 'comercio' && comercioId ? { comercioId } : {}),
+  async login(identifier: string, password: string, accountType: TipoCuenta = 'cliente'): Promise<AuthActionResult> {
+    const payload: LoginPayload = { identifier: identifier.trim(), password, accountType };
+    if (!payload.identifier || !payload.password.trim()) return { success: false, message: 'Completa tu usuario/correo y contraseña.' };
+    try {
+      const res = await firstValueFrom(this.http.post<ApiResponse<AuthSessionData>>(`${this.config.apiBaseUrl}/api/auth/login`, payload).pipe(timeout(AUTH_REQUEST_TIMEOUT_MS)));
+      await this.applySession(res.data);
+      return { success: true };
+    } catch (err) { return this.mapError(err, 'No se pudo iniciar sesión.'); }
+  }
+
+  /**
+   * Comercio: con `localNuevo` se crea un local propio (titular); con `comercioId` se registra como sucursal
+   * (asistente) de ese comercio.
+   */
+  async register(nombre: string, correo: string, password: string, tipo: TipoCuenta = 'cliente', comercioId?: string, localNuevo?: { nombre: string; categoria?: string }): Promise<AuthActionResult> {
+    const payload: RegisterPayload = { fullName: nombre.trim(), email: correo.trim().toLowerCase(), password, accountType: tipo, tenantId: null };
+    if (tipo === 'comercio') {
+      if (localNuevo) {
+        payload.businessMode = 'new';
+        payload.tenantName = localNuevo.nombre.trim();
+        if (localNuevo.categoria) payload.category = localNuevo.categoria;
+      } else {
+        payload.businessMode = 'branch';
+        payload.tenantId = comercioId || null;
+      }
+    }
+    if (!payload.fullName || !payload.email || !payload.password.trim()) return { success: false, message: 'Completa todos los campos obligatorios.' };
+    if (payload.businessMode === 'new' && !payload.tenantName) return { success: false, message: 'Escribe el nombre de tu local.' };
+    if (payload.businessMode === 'branch' && !payload.tenantId) return { success: false, message: 'Selecciona el comercio asociado.' };
+    try {
+      const res = await firstValueFrom(this.http.post<ApiResponse<AuthSessionData>>(`${this.config.apiBaseUrl}/api/auth/register`, payload).pipe(timeout(AUTH_REQUEST_TIMEOUT_MS)));
+      await this.applySession(res.data);
+      return { success: true };
+    } catch (err) { return this.mapError(err, 'No se pudo crear la cuenta.'); }
+  }
+
+  async cerrarSesion() { await this.logout(); }
+  async logout() {
+    // El estado en memoria se limpia primero: un fallo del almacenamiento no debe impedir cerrar sesión.
+    this.clearSession();
+    this.restorePromise = null;
+    try { await this.tokenStorage.clear(); } catch { /* la sesión en memoria ya quedó anónima; el guard no deja pasar sin usuario */ }
+  }
+
+  private async applySession(data: AuthSessionData) {
+    await this.tokenStorage.setToken(data.auth.accessToken);
+    this.clearLegacy();
+    this._currentUser.set(this.toSession(data.user, data.membership));
+    this.authStatus.set('authenticated');
+  }
+
+  private clearSession() { this._currentUser.set(null); this.authStatus.set('anonymous'); }
+  private clearLegacy() { try { localStorage.removeItem('snacki.current-user'); localStorage.removeItem('snacki.profiles'); } catch {} }
+
+  private toSession(user: AuthSessionData['user'], membership: AuthSessionData['membership']): SessionUser {
+    const comercioId = membership.role === 'comercio' ? (membership.tenantSlug || membership.tenantId) : undefined;
+    return {
+      id: user.id, fullName: user.fullName, email: user.email, role: membership.role,
+      tenantId: membership.tenantId, tenantSlug: membership.tenantSlug, tenantName: membership.tenantName,
+      ...(membership.role === 'comercio' ? { staffRole: membership.staffRole ?? 'owner' } : {}),
+      nombre: user.fullName, correo: user.email, tipo: membership.role, ...(comercioId ? { comercioId } : {}),
     };
-    const perfiles = this.leerPerfiles().filter((item) => item.correo.toLowerCase() !== perfil.correo.toLowerCase());
-    perfiles.push(perfil);
-    localStorage.setItem(PROFILES_KEY, JSON.stringify(perfiles));
-    this.guardarSesion(perfil);
   }
 
-  cerrarSesion() {
-    localStorage.removeItem(SESSION_KEY);
-    this.usuarioActual = null;
-  }
-
-  private guardarSesion(usuario: SnackiUser) {
-    this.usuarioActual = usuario;
-    localStorage.setItem(SESSION_KEY, JSON.stringify(usuario));
-  }
-
-  private leerSesion(): SnackiUser | null {
-    try {
-      const valor = localStorage.getItem(SESSION_KEY);
-      if (!valor) return null;
-      const user = JSON.parse(valor) as Partial<SnackiUser>;
-      if (!user.nombre || !user.correo) return null;
-      return { nombre: user.nombre, correo: user.correo, tipo: user.tipo === 'comercio' ? 'comercio' : 'cliente', ...(user.comercioId ? { comercioId: user.comercioId } : {}) };
-    } catch {
-      return null;
-    }
-  }
-
-  private leerPerfiles(): SnackiUser[] {
-    try {
-      const valor = localStorage.getItem(PROFILES_KEY);
-      return valor ? (JSON.parse(valor) as Partial<SnackiUser>[]).filter((perfil): perfil is SnackiUser => !!perfil.nombre && !!perfil.correo).map((perfil) => ({
-        nombre: perfil.nombre!, correo: perfil.correo!, tipo: perfil.tipo === 'comercio' ? 'comercio' : 'cliente',
-        ...(perfil.comercioId ? { comercioId: perfil.comercioId } : {}),
-      })) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  private nombreDesdeIdentificador(identificador: string): string {
-    const nombre = identificador.includes('@') ? identificador.split('@')[0] : identificador;
-    return this.formatearNombre(nombre.replace(/[._-]+/g, ' '));
-  }
-
-  private formatearNombre(nombre: string): string {
-    return nombre
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean)
-      .map((parte) => parte.charAt(0).toLocaleUpperCase('es') + parte.slice(1))
-      .join(' ');
+  private mapError(err: unknown, fallback: string): AuthActionResult {
+    const sinConexion = 'No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.';
+    if (err instanceof TimeoutError) return { success: false, code: 'TIMEOUT', message: sinConexion };
+    if (!(err instanceof HttpErrorResponse)) return { success: false, message: fallback };
+    if (err.status === 0) return { success: false, code: 'NETWORK_ERROR', message: sinConexion };
+    const api = err.error?.error;
+    const code = api?.code as string | undefined;
+    const message = (api?.message as string | undefined) || fallback;
+    if (err.status === 401) return { success: false, code: code || 'UNAUTHORIZED', message: 'Credenciales inválidas o sesión expirada.' };
+    if (err.status === 403) return { success: false, code: code || 'FORBIDDEN', message: message || 'No tienes acceso con el tipo de cuenta seleccionado.' };
+    if (err.status === 409) return { success: false, code: code || 'CONFLICT', message: message || 'El correo ya está registrado.' };
+    if (err.status === 400) return { success: false, code: code || 'VALIDATION_ERROR', message: message || 'Datos inválidos.' };
+    if (err.status === 404) return { success: false, code: code || 'NOT_FOUND', message: message || 'Recurso no encontrado.' };
+    return { success: false, code, message: err.status >= 500 ? 'El servidor no pudo procesar la solicitud. Inténtalo más tarde.' : message };
   }
 }

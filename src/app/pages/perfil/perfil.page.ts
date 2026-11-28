@@ -1,23 +1,22 @@
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { IonButton, IonCheckbox, IonContent, IonIcon, IonInput } from '@ionic/angular';
+import { RouterLink } from '@angular/router';
+import { IonButton, IonCheckbox, IonContent, IonIcon, IonInput, NavController } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { eyeOutline, eyeOffOutline } from 'ionicons/icons';
+import { eyeOutline, eyeOffOutline, giftOutline } from 'ionicons/icons';
 import { SnackiHeaderComponent } from '../../shared/snacki-header/snacki-header.component';
 import { AuthService } from '../../services/auth.service';
-import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-perfil',
   templateUrl: './perfil.page.html',
   styleUrls: ['./perfil.page.scss'],
-  imports: [IonContent, IonInput, IonButton, IonCheckbox, IonIcon, FormsModule, SnackiHeaderComponent],
+  imports: [IonContent, IonInput, IonButton, IonCheckbox, IonIcon, FormsModule, RouterLink, SnackiHeaderComponent],
 })
 export class PerfilPage {
   private auth = inject(AuthService);
-  private router = inject(Router);
+  private nav = inject(NavController);
 
-  // Datos de ejemplo del diseño
   nombre = this.auth.currentUser?.nombre ?? 'Usuario';
   correo = this.auth.currentUser?.correo ?? '';
   cedula = '1234599';
@@ -26,7 +25,7 @@ export class PerfilPage {
   verCedula = false;
 
   constructor() {
-    addIcons({ eyeOutline, eyeOffOutline });
+    addIcons({ eyeOutline, eyeOffOutline, giftOutline });
   }
 
   get cedulaMostrada(): string {
@@ -36,8 +35,9 @@ export class PerfilPage {
 
   agregarFoto() {}
 
-  cerrarSesion() {
-    this.auth.cerrarSesion();
-    this.router.navigateByUrl('/login');
+  async cerrarSesion() {
+    await this.auth.cerrarSesion();
+    // navigateRoot vacía la pila de Ionic (tabs incluidas) y deja el login como única pantalla.
+    await this.nav.navigateRoot('/login', { replaceUrl: true });
   }
 }

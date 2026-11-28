@@ -1,0 +1,386 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserTenantRole {
+  cliente
+  comercio
+}
+
+/// Rol dentro de un comercio: el titular crea el local; el asistente (sucursal) necesita aprobación para cambiar el catálogo.
+enum StaffRole {
+  owner
+  assistant
+}
+
+enum ChangeEntity {
+  product
+  reward
+}
+
+enum ChangeAction {
+  create
+  update
+  delete
+}
+
+enum ChangeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TenantCategory {
+  helado
+  comida_rapida
+  pizza
+  cafe
+  otro
+}
+
+enum PointEntryType {
+  EARN
+  REDEEM
+  REFERRAL_BONUS
+}
+
+enum ReferralStatus {
+  PENDING
+  COMPLETED
+}
+
+enum RedemptionStatus {
+  PENDING
+  DELIVERED
+}
+
+enum DevicePlatform {
+  android
+  ios
+  web
+}
+
+model User {
+  id               String              @id @default(uuid()) @db.Uuid
+  email            String              @unique
+  passwordHash     String              @map("password_hash")
+  fullName         String              @map("full_name")
+  isActive         Boolean             @default(true) @map("is_active")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+  memberships      UserTenantRoleMap[]
+  claimsCreated    PurchaseClaim[]     @relation("ClaimCreatedBy")
+  claimsClaimed    PurchaseClaim[]     @relation("ClaimClaimedBy")
+  redeemQrsCreated RedemptionClaim[]   @relation("RedeemQrCreatedBy")
+  redeemQrsClaimed RedemptionClaim[]   @relation("RedeemQrClaimedBy")
+  pointEntries     PointEntry[]
+  redemptions      Redemption[]
+  devices          DeviceToken[]
+  changesRequested ChangeRequest[]     @relation("ChangeRequestedBy")
+  changesReviewed  ChangeRequest[]     @relation("ChangeReviewedBy")
+  referralCodes    ReferralCode[]
+  referralsMade    Referral[]          @relation("ReferralReferrer")
+  referralsJoined  Referral[]          @relation("ReferralReferee")
+
+  @@map("users")
+}
+
+model Tenant {
+  id                  String              @id @default(uuid()) @db.Uuid
+  name                String
+  slug                String              @unique
+  category            TenantCategory      @default(otro)
+  address             String?
+  latitude            Float?
+  longitude           Float?
+  logoUrl             String?             @map("logo_url")
+  pointsExpireAt      DateTime?           @map("points_expire_at")
+  /// Reglas de referidos: bono para quien invita y para el invitado, y tope de invitaciones por cliente (anti-abuso).
+  referralEnabled     Boolean             @default(false) @map("referral_enabled")
+  referrerBonusPoints Int                 @default(0) @map("referrer_bonus_points")
+  refereeBonusPoints  Int                 @default(0) @map("referee_bonus_points")
+  referralMaxPerUser  Int                 @default(10) @map("referral_max_per_user")
+  isActive            Boolean             @default(true) @map("is_active")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+  memberships         UserTenantRoleMap[]
+  products            Product[]
+  rewards             Reward[]
+  claims              PurchaseClaim[]
+  pointEntries        PointEntry[]
+  redemptions         Redemption[]
+  redeemQrs           RedemptionClaim[]
+  notifications       Notification[]
+  changeRequests      ChangeRequest[]
+  referralCodes       ReferralCode[]
+  referrals           Referral[]
+
+  @@index([latitude, longitude])
+  @@map("tenants")
+}
+
+model UserTenantRoleMap {
+  id        String         @id @default(uuid()) @db.Uuid
+  userId    String         @map("user_id") @db.Uuid
+  tenantId  String         @map("tenant_id") @db.Uuid
+  role      UserTenantRole
+  staffRole StaffRole      @default(owner) @map("staff_role")
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@index([tenantId, role])
+  @@map("user_tenant_roles")
+}
+
+/// Producto promocional: solo da puntos mientras la promo está vigente.
+model Product {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  name          String
+  description   String?
+  points        Int
+  imageUrl      String?   @map("image_url")
+  promoStartsAt DateTime  @map("promo_starts_at")
+  promoEndsAt   DateTime  @map("promo_ends_at")
+  isActive      Boolean   @default(true) @map("is_active")
+  /// Borrado lógico: se archiva en vez de borrar si ya tiene ventas (QR), para no perder el historial de puntos.
+  deletedAt     DateTime? @map("deleted_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  claims        PurchaseClaim[]
+  notifications Notification[]
+
+  @@index([tenantId, isActive, promoEndsAt])
+  @@map("products")
+}
+
+model Reward {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String
+  description String?
+  cost        Int
+  imageUrl    String?   @map("image_url")
+  isActive    Boolean   @default(true) @map("is_active")
+  /// Borrado lógico: se archiva en vez de borrar si ya tiene canjes.
+  deletedAt   DateTime? @map("deleted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pointEntries PointEntry[]
+  redemptions  Redemption[]
+  redeemQrs    RedemptionClaim[]
+
+  @@index([tenantId, isActive])
+  @@map("rewards")
+}
+
+/// QR de una venta: un solo uso, vence en 24 h (permite sincronizar offline).
+model PurchaseClaim {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  productId   String    @map("product_id") @db.Uuid
+  quantity    Int       @default(1)
+  points      Int
+  expiresAt   DateTime  @map("expires_at")
+  createdById String    @map("created_by_id") @db.Uuid
+  claimedById String?   @map("claimed_by_id") @db.Uuid
+  claimedAt   DateTime? @map("claimed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  createdBy  User        @relation("ClaimCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  claimedBy  User?       @relation("ClaimClaimedBy", fields: [claimedById], references: [id], onDelete: SetNull)
+  pointEntry PointEntry?
+  referral   Referral?
+
+  @@index([tenantId, createdAt])
+  @@map("purchase_claims")
+}
+
+/// Libro de puntos. Saldo = suma de `remaining` de EARN y REFERRAL_BONUS no vencidos.
+/// Los canjes los consumen en orden FIFO por `expiresAt`.
+model PointEntry {
+  id         String         @id @default(uuid()) @db.Uuid
+  userId     String         @map("user_id") @db.Uuid
+  tenantId   String         @map("tenant_id") @db.Uuid
+  type       PointEntryType
+  points     Int
+  remaining  Int            @default(0)
+  expiresAt  DateTime?      @map("expires_at")
+  claimId    String?        @unique @map("claim_id") @db.Uuid
+  rewardId   String?        @map("reward_id") @db.Uuid
+  /// Referido que originó un REFERRAL_BONUS.
+  referralId String?        @map("referral_id") @db.Uuid
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  claim    PurchaseClaim? @relation(fields: [claimId], references: [id], onDelete: SetNull)
+  reward   Reward?        @relation(fields: [rewardId], references: [id], onDelete: SetNull)
+  referral Referral?      @relation(fields: [referralId], references: [id], onDelete: SetNull)
+
+  /// Un solo bono por persona y referido (segunda barrera contra liquidar dos veces).
+  @@unique([referralId, userId])
+  @@index([userId, tenantId, type, expiresAt])
+  @@index([tenantId, createdAt])
+  @@map("point_entries")
+}
+
+model Redemption {
+  id          String           @id @default(uuid()) @db.Uuid
+  userId      String           @map("user_id") @db.Uuid
+  tenantId    String           @map("tenant_id") @db.Uuid
+  rewardId    String           @map("reward_id") @db.Uuid
+  code        String           @unique
+  cost        Int
+  status      RedemptionStatus @default(PENDING)
+  deliveredAt DateTime?        @map("delivered_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  reward   Reward           @relation(fields: [rewardId], references: [id], onDelete: Restrict)
+  redeemQr RedemptionClaim?
+
+  @@index([tenantId, status, createdAt])
+  @@map("redemptions")
+}
+
+/// QR de canje: lo genera el comercio para una recompensa y el cliente lo escanea en el local.
+/// Un solo uso y vence a los pocos minutos: así no se pueden gastar puntos sin estar frente al comercio.
+model RedemptionClaim {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  rewardId     String    @map("reward_id") @db.Uuid
+  /// Costo fijado al generar el QR (lo que ve el cliente al confirmar).
+  cost         Int
+  expiresAt    DateTime  @map("expires_at")
+  createdById  String    @map("created_by_id") @db.Uuid
+  claimedById  String?   @map("claimed_by_id") @db.Uuid
+  claimedAt    DateTime? @map("claimed_at")
+  redemptionId String?   @unique @map("redemption_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  reward     Reward      @relation(fields: [rewardId], references: [id], onDelete: Restrict)
+  createdBy  User        @relation("RedeemQrCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  claimedBy  User?       @relation("RedeemQrClaimedBy", fields: [claimedById], references: [id], onDelete: SetNull)
+  redemption Redemption? @relation(fields: [redemptionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@map("redemption_claims")
+}
+
+model DeviceToken {
+  id        String         @id @default(uuid()) @db.Uuid
+  userId    String         @map("user_id") @db.Uuid
+  token     String         @unique
+  platform  DevicePlatform
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+/// Audiencia = clientes con PointEntry en el tenant.
+model Notification {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  productId  String?  @map("product_id") @db.Uuid
+  title      String
+  body       String
+  recipients Int      @default(0)
+  sentAt     DateTime @default(now()) @map("sent_at")
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, sentAt])
+  @@map("notifications")
+}
+
+/// Cambio de catálogo propuesto por un asistente; no se aplica hasta que un titular lo aprueba.
+model ChangeRequest {
+  id              String       @id @default(uuid()) @db.Uuid
+  tenantId        String       @map("tenant_id") @db.Uuid
+  requestedById   String       @map("requested_by_id") @db.Uuid
+  entity          ChangeEntity
+  action          ChangeAction
+  /// Producto o recompensa afectado (null al crear).
+  targetId        String?      @map("target_id") @db.Uuid
+  /// Nombre del elemento al momento de la solicitud, para mostrarlo aunque luego cambie.
+  targetName      String?      @map("target_name")
+  /// Datos ya validados con el mismo esquema que usa el API directo (null al borrar).
+  payload         Json?
+  status          ChangeStatus @default(PENDING)
+  reviewedById    String?      @map("reviewed_by_id") @db.Uuid
+  reviewedAt      DateTime?    @map("reviewed_at")
+  rejectionReason String?      @map("rejection_reason")
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestedBy User   @relation("ChangeRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  reviewedBy  User?  @relation("ChangeReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status, createdAt])
+  @@index([requestedById])
+  @@map("change_requests")
+}
+
+/// Código de invitación de un cliente en un comercio (uno por comercio: los puntos no se mezclan).
+model ReferralCode {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  code      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@map("referral_codes")
+}
+
+/// Invitación aplicada. Queda PENDING hasta la primera compra promocional del invitado en el comercio;
+/// en esa misma transacción pasa a COMPLETED y se acreditan los dos REFERRAL_BONUS.
+model Referral {
+  id                String         @id @default(uuid()) @db.Uuid
+  tenantId          String         @map("tenant_id") @db.Uuid
+  referrerId        String         @map("referrer_id") @db.Uuid
+  refereeId         String         @map("referee_id") @db.Uuid
+  code              String
+  status            ReferralStatus @default(PENDING)
+  /// Compra (QR) que completó el referido.
+  qualifyingClaimId String?        @unique @map("qualifying_claim_id") @db.Uuid
+  createdAt         DateTime       @default(now()) @map("created_at")
+  completedAt       DateTime?      @map("completed_at")
+
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  referrer        User           @relation("ReferralReferrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referee         User           @relation("ReferralReferee", fields: [refereeId], references: [id], onDelete: Cascade)
+  qualifyingClaim PurchaseClaim? @relation(fields: [qualifyingClaimId], references: [id], onDelete: SetNull)
+  bonusEntries    PointEntry[]
+
+  /// Un cliente solo puede ser referido una vez por comercio.
+  @@unique([tenantId, refereeId])
+  @@index([tenantId, referrerId, status])
+  @@map("referrals")
+}

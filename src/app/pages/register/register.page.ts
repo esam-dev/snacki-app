@@ -1,12 +1,25 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
-import { IonButton, IonCheckbox, IonContent, IonIcon, IonInput, IonSelect, IonSelectOption, ToastController } from '@ionic/angular';
+import { ActivatedRoute } from '@angular/router';
+import { IonButton, IonCheckbox, IonContent, IonIcon, IonInput, IonSelect, IonSelectOption, NavController, ToastController } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { eyeOffOutline, eyeOutline } from 'ionicons/icons';
+import { firstValueFrom } from 'rxjs';
+import { ApiResponse } from '../../models/auth.models';
 import { SnackiHeaderComponent } from '../../shared/snacki-header/snacki-header.component';
+import { AppConfigService } from '../../services/app-config.service';
 import { AuthService } from '../../services/auth.service';
-import { StoreService } from '../../services/store.service';
+
+interface TenantOption { id: string; name: string; slug: string; }
+
+const CATEGORIAS_LOCAL = [
+  { id: 'comida_rapida', nombre: 'Comida rápida' },
+  { id: 'pizza', nombre: 'Pizza' },
+  { id: 'cafe', nombre: 'Café' },
+  { id: 'helado', nombre: 'Helados' },
+  { id: 'otro', nombre: 'Otros' },
+];
 
 @Component({
   selector: 'app-register',
@@ -14,51 +27,74 @@ import { StoreService } from '../../services/store.service';
   styleUrls: ['./register.page.scss'],
   imports: [IonContent, IonInput, IonButton, IonCheckbox, IonIcon, IonSelect, IonSelectOption, FormsModule, SnackiHeaderComponent],
 })
-export class RegisterPage {
-  private router = inject(Router);
+export class RegisterPage implements OnInit {
+  private nav = inject(NavController);
+  private cdr = inject(ChangeDetectorRef);
   private toast = inject(ToastController);
   private auth = inject(AuthService);
   private route = inject(ActivatedRoute);
-  private stores = inject(StoreService);
+  private http = inject(HttpClient);
+  private config = inject(AppConfigService);
+  private returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') ?? '';
 
   tipoCuenta: 'cliente' | 'comercio' = this.route.snapshot.queryParamMap.get('tipo') === 'comercio' ? 'comercio' : 'cliente';
-  locales = this.stores.getAll();
-
-  form = {
-    nombre: '',
-    edad: null as number | null,
-    password: '',
-    confirmar: '',
-    correo: '',
-    cedula: '',
-    acepta: false,
-    comercioId: '',
-  };
-
+  /** Comercio: `nuevo` crea un local propio (titular); `sucursal` se une a uno existente (asistente). */
+  modoComercio: 'nuevo' | 'sucursal' = 'nuevo';
+  readonly categorias = CATEGORIAS_LOCAL;
+  locales: TenantOption[] = [];
+  cargandoLocales = false;
+  form = { nombre: '', edad: null as number | null, password: '', confirmar: '', correo: '', cedula: '', acepta: false, comercioId: '', nombreLocal: '', categoria: 'otro' };
   verPassword = false;
   verConfirmar = false;
+  enviando = false;
 
-  constructor() {
-    addIcons({ eyeOutline, eyeOffOutline });
+  constructor() { addIcons({ eyeOutline, eyeOffOutline }); }
+  ngOnInit() { void this.cargarLocales(); }
+
+  async cargarLocales() {
+    this.cargandoLocales = true;
+    try {
+      const res = await firstValueFrom(this.http.get<ApiResponse<{ tenants: TenantOption[] }>>(`${this.config.apiBaseUrl}/api/tenants`));
+      this.locales = (res.data?.tenants || []).filter((t) => t.slug !== 'snacki');
+    } catch { this.locales = []; } finally { this.cargandoLocales = false; this.cdr.markForCheck(); }
   }
 
   async registrar() {
+    if (this.enviando) return;
     const f = this.form;
-    let error = '';
-    if (!f.nombre.trim() || !f.password || !f.correo.trim() || !f.cedula.trim() || (this.tipoCuenta === 'cliente' && f.edad === null) || (this.tipoCuenta === 'comercio' && !f.comercioId)) error = 'Completa todos los campos.';
-    else if (this.tipoCuenta === 'cliente' && (!Number.isInteger(Number(f.edad)) || Number(f.edad) < 18)) error = 'Debes tener 18 años o más para registrarte.';
-    else if (f.password !== f.confirmar) error = 'Las contraseñas no coinciden.';
-    else if (!f.acepta) error = 'Debes aceptar los términos y condiciones.';
+    const error = !f.nombre.trim() || !f.password || !f.correo.trim() || !f.cedula.trim() || (this.tipoCuenta === 'cliente' && f.edad === null) || (this.tipoCuenta === 'comercio' && this.modoComercio === 'sucursal' && !f.comercioId) || (this.tipoCuenta === 'comercio' && this.modoComercio === 'nuevo' && !f.nombreLocal.trim())
+      ? 'Completa todos los campos.'
+      : this.tipoCuenta === 'cliente' && (!Number.isInteger(Number(f.edad)) || Number(f.edad) < 18)
+      ? 'Debes tener 18 años o más para registrarte.'
+      : f.password.length < 8 ? 'La contraseña debe tener al menos 8 caracteres.'
+      : f.password !== f.confirmar ? 'Las contraseñas no coinciden.'
+      : !f.acepta ? 'Debes aceptar los términos y condiciones.' : '';
+    if (error) return this.mostrarToast(error, 'danger');
 
-    if (error) {
-      const t = await this.toast.create({ message: error, duration: 2200, color: 'danger' });
-      await t.present();
-      return;
-    }
-    this.auth.registrar(f.nombre, f.correo, this.tipoCuenta, f.comercioId || undefined);
-    this.router.navigateByUrl(this.tipoCuenta === 'comercio' ? '/comercio' : '/tabs/home');
+    this.enviando = true;
+    try {
+      const result = await this.auth.register(
+        f.nombre, f.correo, f.password, this.tipoCuenta,
+        this.modoComercio === 'sucursal' ? f.comercioId || undefined : undefined,
+        this.tipoCuenta === 'comercio' && this.modoComercio === 'nuevo' ? { nombre: f.nombreLocal, categoria: f.categoria } : undefined,
+      );
+      if (!result.success) return this.mostrarToast(result.message || 'No se pudo crear la cuenta.', 'danger');
+      await this.nav.navigateRoot(this.destinoSeguro(), { replaceUrl: true });
+    } finally { this.enviando = false; this.cdr.markForCheck(); }
   }
 
-  /** Pendiente: integrar @capacitor/camera para elegir/tomar la foto de perfil. */
+  get nombreSucursal(): string {
+    return this.locales.find((l) => l.id === this.form.comercioId)?.name ?? '';
+  }
+
   agregarFoto() {}
+
+  private destinoSeguro(): string {
+    return this.returnUrl.startsWith('/') && !this.returnUrl.startsWith('//') ? this.returnUrl : (this.tipoCuenta === 'comercio' ? '/comercio' : '/tabs/home');
+  }
+
+  private async mostrarToast(message: string, color: 'danger' | 'success' | 'medium' = 'medium') {
+    const t = await this.toast.create({ message, duration: 2200, color, position: 'bottom' });
+    await t.present();
+  }
 }

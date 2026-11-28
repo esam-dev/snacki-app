@@ -1,0 +1,98 @@
+<section class="estadisticas">
+  <div class="cab">
+    <div class="rangos" role="group" aria-label="Período">
+      @for (r of rangos; track r.valor) {
+        <button type="button" [class.activo]="rango === r.valor" [attr.aria-pressed]="rango === r.valor" (click)="elegirRango(r.valor)">
+          {{ r.etiqueta }}
+        </button>
+      }
+    </div>
+    <button type="button" class="refrescar" (click)="refrescar()" [disabled]="cargandoStats || cargandoCanjes" aria-label="Actualizar">
+      <app-icon name="refresh" />
+    </button>
+  </div>
+
+  @if (errorStats) {
+    <p class="vacio error">No se pudieron cargar las estadísticas. <button type="button" class="link" (click)="cargarStats()">Reintentar</button></p>
+  } @else if (!stats) {
+    <p class="vacio">Cargando estadísticas…</p>
+  } @else {
+    <div class="kpis" [class.cargando]="cargandoStats" aria-live="polite">
+      <div class="kpi">
+        <span class="etq">Puntos emitidos</span>
+        <strong>{{ stats.pointsIssued | number }}</strong>
+        <span class="nota">{{ stats.purchases | number }} {{ stats.purchases === 1 ? 'compra escaneada' : 'compras escaneadas' }}</span>
+      </div>
+      <div class="kpi">
+        <span class="etq">Canjes</span>
+        <strong>{{ stats.redemptions | number }}</strong>
+        <span class="nota">{{ stats.pointsRedeemed | number }} pts canjeados</span>
+      </div>
+      <div class="kpi">
+        <span class="etq">Clientes únicos</span>
+        <strong>{{ stats.uniqueCustomers | number }}</strong>
+        <span class="nota">Compraron al menos una vez</span>
+      </div>
+      <div class="kpi" title="Clientes con 2 o más compras en el período">
+        <span class="etq">Clientes recurrentes</span>
+        <strong>{{ stats.returningCustomers | number }}</strong>
+        <span class="nota">
+          @if (tasaRecompra !== null) { {{ tasaRecompra | percent: '1.0-0' }} volvió a comprar } @else { Sin compras en el período }
+        </span>
+      </div>
+    </div>
+
+    <div class="bloques" [class.cargando]="cargandoStats">
+      <div class="bloque">
+        <h3><app-icon name="tag" /> Promo más escaneada</h3>
+        @if (stats.topPromo) {
+          <p class="top"><strong>{{ stats.topPromo.name }}</strong> <span>{{ stats.topPromo.scans | number }} {{ stats.topPromo.scans === 1 ? 'escaneo' : 'escaneos' }}</span></p>
+        } @else {
+          <p class="nota">Todavía no hay compras escaneadas en este período.</p>
+        }
+      </div>
+
+      <div class="bloque">
+        <h3><app-icon name="gift" /> Referidos</h3>
+        <dl class="referidos">
+          <div><dt>Invitados sin compra</dt><dd>{{ stats.referrals.pending | number }}</dd></div>
+          <div><dt>Clientes nuevos por referido</dt><dd>{{ stats.referrals.completed | number }}</dd></div>
+          <div><dt>Bono emitido</dt><dd>{{ stats.referrals.bonusIssued | number }} pts</dd></div>
+          <div title="De los invitados en el período, cuántos ya hicieron su primera compra">
+            <dt>Conversión</dt>
+            <dd>{{ stats.referrals.conversion === null ? '—' : (stats.referrals.conversion | percent: '1.0-0') }}</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  }
+
+  <div class="canjes">
+    <h3><app-icon name="clock" /> Últimos canjes</h3>
+    @if (cargandoCanjes && !canjes.length) {
+      <p class="vacio">Cargando canjes…</p>
+    } @else if (!canjes.length) {
+      <p class="vacio">Aún no hay canjes. Genera un QR de canje desde Recompensas para que tus clientes usen sus puntos.</p>
+    } @else {
+      <ul class="lista">
+        @for (c of canjes; track c.id) {
+          <li class="item">
+            <div class="info">
+              <strong>{{ c.reward.name }}</strong>
+              <span class="meta">{{ c.customerName }} · {{ c.createdAt | date: 'dd/MM/yyyy HH:mm' }}</span>
+            </div>
+            <div class="der">
+              <span class="costo">{{ c.cost | number }} pts</span>
+              <code class="codigo" title="Código del canje">{{ c.code }}</code>
+            </div>
+          </li>
+        }
+      </ul>
+      @if (cursor) {
+        <button type="button" class="mas" (click)="verMas()" [disabled]="cargandoMas">
+          {{ cargandoMas ? 'Cargando…' : 'Ver más' }}
+        </button>
+      }
+    }
+  </div>
+</section>

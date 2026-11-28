@@ -5,11 +5,19 @@ node_modules/
 /dist
 /www
 /.angular/cache
+/.firebase
 /coverage
 
 # Capacitor
 /ios
-/android
+/android/app/build
+/android/build
+/android/.gradle
+/android/local.properties
+/android/app/src/main/assets/public
+/android/app/src/main/assets/capacitor.config.json
+/android/app/src/main/assets/capacitor.plugins.json
+google-services.json
 /.capacitor
 
 # IDE

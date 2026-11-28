@@ -1,0 +1,20 @@
+:host { display: block; }
+.solicitudes { background: #fff; border: 1px solid #dadde1; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+.intro { margin: 0 0 12px; color: #65676b; font-size: 13px; }
+.vacio { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 12px 0; color: #65676b; font-size: 14px; app-icon { font-size: 18px; color: #1f8a4c; } }
+.lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.item { border: 1px solid #ebedf0; border-radius: 8px; padding: 12px; background: #fff; }
+.item.pendiente { border-color: #f1c36d; background: #fffaf0; }
+.cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; strong { font-size: 14px; color: #1c1e21; } }
+.estado { flex-shrink: 0; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #e4e6eb; color: #4b4f56; }
+.estado[data-estado='PENDING'] { background: #fdebc8; color: #b86e00; }
+.estado[data-estado='APPROVED'] { background: #dff3e6; color: #1f8a4c; }
+.estado[data-estado='REJECTED'] { background: #fde2e0; color: #d93025; }
+.meta { display: flex; align-items: center; gap: 4px; margin-top: 4px; color: #8a8d91; font-size: 12px; app-icon { font-size: 13px; } }
+.detalle { margin: 10px 0 0; display: grid; gap: 4px; div { display: flex; gap: 8px; font-size: 13px; } dt { color: #65676b; min-width: 96px; } dd { margin: 0; color: #1c1e21; word-break: break-word; } }
+.motivo { margin: 8px 0 0; font-size: 13px; color: #d93025; }
+.revision { margin: 6px 0 0; font-size: 12px; color: #8a8d91; }
+.acciones { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.acciones button { height: 34px; padding: 0 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid transparent; &:disabled { opacity: .5; cursor: default; } }
+.rechazar { background: #fff; border-color: #c4c8ce !important; color: #d93025; }
+.aprobar { background: #1b74e4; color: #fff; }
