@@ -121,21 +121,51 @@ Abre http://localhost:4200. La app lee la URL de la API desde `src/assets/config
 
 > En el navegador la cámara y algunos plugins nativos (escáner, notificaciones) no funcionan igual que en el celular. Para probarlos usa Android.
 
-### 5. App en Android (APK)
+### 5. App en Android (prueba local)
 
-La carpeta `android/` ya está versionada (permisos de cámara y ubicación incluidos). El APK carga la app desde `https://localhost`, que el backend acepta en CORS.
+La app instalada en el celular se conecta **solo a la API**, nunca a la base de datos. Para probar en un celular real, la API corre en tu PC y los dos deben estar en **la misma red Wi-Fi**. La API puede usar la base que tengas en `backend/.env` (local o remota).
 
-Desde la raíz del proyecto (PowerShell):
+**Requisitos:** Android Studio con un SDK instalado, el celular con depuración USB activada (o un emulador) y Node 22.
+
+**Paso 1. Deja la API accesible desde la red**
+
+1. Averigua la IP de tu PC con `ipconfig` (ej. `192.168.1.10`).
+2. Permite el puerto 3000 en el Firewall de Windows (red privada).
+3. En `backend/` corre `npm run dev`. Debe decir `Server listening at http://...:3000`. Si dice otro puerto, revisa `PORT` en `backend/.env`.
+4. En el navegador **del celular** abre `http://192.168.1.10:3000/health`: debe responder `{"status":"ok"}`. Si no abre, es la red o el firewall, no la app.
+
+**Paso 2. Compila la app apuntando a tu PC** (desde la raíz del proyecto, en este orden)
 
 ```powershell
-$env:RAILWAY_API_URL = "https://snacki-app-production.up.railway.app"
-npm run android:apk
+npm run build
+npm run config:lan -- http://192.168.1.10:3000
+npx cap add android        # solo la primera vez
+npx cap sync android
+npm run android:setup      # permiso de cámara; repítelo después de cada sync
+npx cap open android       # Android Studio → Run ▶
 ```
 
-- `android:sync` = build de producción + `www/assets/config.json` apuntando a Railway + `npx cap sync android`. `android:apk` además compila el APK de debug.
-- El APK queda en `android/app/build/outputs/apk/debug/app-debug.apk`. Cópialo al celular (o `adb install -r <ruta>`) y permite "instalar apps desconocidas".
-- Necesitas JDK 21 y el SDK de Android (Android Studio); si Gradle no lo encuentra, crea `android/local.properties` con `sdk.dir=C:/Users/<tu-usuario>/AppData/Local/Android/Sdk` (no se versiona).
-- Para probar contra tu PC en la red (`config:production` exige HTTPS): después de `npm run android:sync` edita `www/assets/config.json` con `http://<IP>:3000` y vuelve a correr `npx cap sync android`.
+- `build` va **antes** de `config:lan`: el build borra el `config.json` anterior.
+- `config:lan` escribe `www/assets/config.json` (no se versiona) y rechaza `localhost`, porque en el celular sería el propio celular.
+- `android:setup` agrega `android.permission.CAMERA` al `AndroidManifest.xml`, que se genera con `cap add android` y no se versiona. Sin ese permiso, Android nunca muestra el diálogo y el escáner QR falla.
+- `capacitor.config.ts` sirve la app por `http` y permite tráfico sin cifrar para que Android no bloquee las llamadas a la API local. **Úsalo solo en desarrollo.**
+
+**Paso 3. Instala y verifica**
+
+1. Instala la APK Generada.
+2. Abre la app e inicia sesión con un usuario de prueba (tabla de arriba).
+
+**Si algo falla**
+
+| Síntoma | Qué revisar |
+|---|---|
+| La app no encuentra el servidor | `/health` debe abrir en el navegador del celular. Revisa que `android/app/src/main/assets/public/assets/config.json` tenga tu IP y no `localhost` (si no, repite desde `npm run build`). |
+| Cambió la IP de la PC | El router puede reasignarla: repite desde `npm run build`. |
+| Error de CORS | La API acepta `https://localhost` y `http://localhost`; si usas otro origen, agrégalo a `CORS_ORIGIN` y reinicia la API. |
+| El QR no pide permiso de cámara | Corre `npm run android:setup`, revisa que el manifiesto tenga `android.permission.CAMERA` y vuelve a compilar. Si lo negaste antes, actívalo en Ajustes > Aplicaciones > Snacki > Permisos. |
+| Cambié código del front | `npm run build`, `npm run config:lan -- <url>`, `npx cap sync android`, `npm run android:setup` y Run ▶. |
+
+> Si tu `backend/.env` apunta a una base remota, `npm test` en `backend/` ejecuta los tests de integración contra esa base. Para correrlos usa una base local o de pruebas.
 
 ## Comandos útiles
 
@@ -160,7 +190,9 @@ npm run android:apk
 - **Puerto 5432 ocupado**: ya tienes otro Postgres instalado. Detenlo o cambia el puerto en `docker-compose.yml` y en `DATABASE_URL`.
 - **`The migration ... was modified after it was applied`**: tu base local tiene una versión vieja de la migración inicial. Desde `backend/`, corre `npx prisma migrate reset` (borra la base local y vuelve a crearla con el seed).
 - **Error de CORS en la app**: agrega el origen de la app a `CORS_ORIGIN` y reinicia el backend.
-- **Login falla en el celular**: `www/assets/config.json` apunta a `localhost`. Mira la sección de Android.
+- **Login falla en el celular**: `www/assets/config.json` apunta a `localhost` o a una IP vieja. Mira la sección de Android.
+- **El QR no abre la cámara ni pide permiso**: falta `android.permission.CAMERA` en el manifiesto. Corre `npm run android:setup` y vuelve a compilar la APK.
+- **La API dice `listening ... :5432`**: `PORT` está mal puesto (5432 es el puerto de Postgres). Debe ser `PORT=3000` en `backend/.env`, y no debe haber un `PORT` en las variables de entorno de tu sistema.
 
 ## Despliegue a producción
 
