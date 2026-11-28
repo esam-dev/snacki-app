@@ -9,11 +9,11 @@
     "build": "ng build",
     "build:prod": "ng build --configuration production",
     "config:production": "node scripts/write-runtime-config.mjs",
+    "config:lan": "node scripts/write-runtime-config.mjs --lan",
+    "android:setup": "node scripts/android-setup.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "lint": "ng lint",
-    "android:sync": "npm run build:prod && npm run config:production && npx cap sync android",
-    "android:apk": "npm run android:sync && cd android && gradlew assembleDebug"
+    "lint": "ng lint"
   },
   "private": true,
   "dependencies": {
@@ -25,7 +25,6 @@
     "@angular/router": "22.2.3",
     "@capacitor-community/sqlite": "^8.1.1",
     "@capacitor-mlkit/barcode-scanning": "^8.2.2",
-    "@capacitor/android": "^8.5.3",
     "@capacitor/app": "8.1.2",
     "@capacitor/core": "8.5.3",
     "@capacitor/filesystem": "^8.0.0",
