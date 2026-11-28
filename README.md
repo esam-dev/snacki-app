@@ -121,19 +121,21 @@ Abre http://localhost:4200. La app lee la URL de la API desde `src/assets/config
 
 > En el navegador la cámara y algunos plugins nativos (escáner, notificaciones) no funcionan igual que en el celular. Para probarlos usa Android.
 
-### 5. App en Android
+### 5. App en Android (APK)
 
-Desde la raíz del proyecto:
+La carpeta `android/` ya está versionada (permisos de cámara y ubicación incluidos). El APK carga la app desde `https://localhost`, que el backend acepta en CORS.
 
-```bash
-npm run build
-npx cap add android        # solo la primera vez
-npx cap sync android
-npx cap open android       # abre Android Studio → Run ▶
+Desde la raíz del proyecto (PowerShell):
+
+```powershell
+$env:RAILWAY_API_URL = "https://snacki-app-production.up.railway.app"
+npm run android:apk
 ```
 
-- El celular **no puede usar `localhost`** de tu PC. Después del build, sobrescribe `www/assets/config.json` con la URL de Railway o con la IP de tu PC en la red (ej. `http://192.168.1.10:3000`) y agrega ese origen a `CORS_ORIGIN`. No commitees ese archivo generado.
-- Después de cada cambio en el código: `npm run build:prod`, ajusta `www/assets/config.json` si hace falta y corre `npx cap sync android`.
+- `android:sync` = build de producción + `www/assets/config.json` apuntando a Railway + `npx cap sync android`. `android:apk` además compila el APK de debug.
+- El APK queda en `android/app/build/outputs/apk/debug/app-debug.apk`. Cópialo al celular (o `adb install -r <ruta>`) y permite "instalar apps desconocidas".
+- Necesitas JDK 21 y el SDK de Android (Android Studio); si Gradle no lo encuentra, crea `android/local.properties` con `sdk.dir=C:/Users/<tu-usuario>/AppData/Local/Android/Sdk` (no se versiona).
+- Para probar contra tu PC en la red (`config:production` exige HTTPS): después de `npm run android:sync` edita `www/assets/config.json` con `http://<IP>:3000` y vuelve a correr `npx cap sync android`.
 
 ## Comandos útiles
 
