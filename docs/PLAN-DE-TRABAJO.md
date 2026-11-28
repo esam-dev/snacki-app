@@ -150,7 +150,7 @@ Todas salen de `develop` y vuelven por PR a `develop` (revisa la otra persona). 
 | `feat/branch-approvals` | A | Registro con pestañas (local nuevo / sucursal), rol titular-asistente y aprobación de cambios de promos y recompensas | Hecho (PR #16) |
 | `feat/referrals-engine` | A | `ReferralCode` + `Referral` + reglas en `Tenant`; `POST /referrals/apply`, `GET /referrals/me`; liquidación `REFERRAL_BONUS` en `ClaimService`; ajustes en el panel y pantalla "Invita y gana" en el cliente | Hecho (PR #17) |
 | `feat/merchant-redemptions-stats` | A | Lista de canjes y estadísticas por período con métricas de recompra y referidos (entrega inmediata vía QR de canje) | Hecho (PR #18) |
-| `feat/geolocation-map` + `fix/geolocation-map` | A | Mapa de comercios cercanos en Explorar (orden por distancia), ubicación del local elegible en el mapa y mapa en la tienda con "Cómo llegar" | Hecho (PR #15; fix en PR #19) |
+| `feat/geolocation-map` + `fix/geolocation-map` | A | Mapa de comercios cercanos en Explorar (orden por distancia), ubicación del local elegible en el mapa y mapa en la tienda con "Cómo llegar" | Hecho (PR #15 + PR #19) |
 | `chore/android-build` | B | `npx cap add android`, permisos, APK apuntando a Railway | Pendiente (penúltima) |
 | `docs/informe-final` | A + B | Informe, diagramas, README actualizado (deploy en Railway + Firebase Hosting, secrets de GitHub Actions), guion de demo | Pendiente (última) |
 

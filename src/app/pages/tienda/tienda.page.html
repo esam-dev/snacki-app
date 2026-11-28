@@ -11,6 +11,29 @@
       <ion-button class="snacki-btn small" (click)="mostrarQr()">Escanear compra</ion-button>
     </section>
 
+    @if (punto) {
+      <section class="store-map snacki-card" aria-label="Ubicación del local">
+        <div class="map-box">
+          <app-snacki-map [centro]="punto" [zoom]="16" [marcadores]="marcadores" [usuario]="ubicacion.posicion()" />
+        </div>
+        <div class="map-info">
+          <app-icon name="map-pin" />
+          <div class="txt">
+            <strong>{{ local.direccion || 'Ubicación del local' }}</strong>
+            <small>
+              @if (distancia) { A {{ distancia }} de ti }
+              @else if (ubicacion.estado() === 'buscando') { Calculando distancia… }
+              @else if (ubicacion.estado() === 'denegada') { Activa la ubicación para ver la distancia }
+              @else { <button type="button" class="link" (click)="usarUbicacion()">Ver a qué distancia estoy</button> }
+            </small>
+          </div>
+          <a class="go" [href]="urlComoLlegar" target="_blank" rel="noopener">Cómo llegar</a>
+        </div>
+      </section>
+    } @else if (local.direccion) {
+      <p class="store-addr"><app-icon name="map-pin" /> {{ local.direccion }}</p>
+    }
+
     @if (local.referidos?.activo) {
       <button type="button" class="invite-banner" (click)="invitar()">
         <strong>Invita y gana</strong>
